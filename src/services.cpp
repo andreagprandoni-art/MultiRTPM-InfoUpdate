@@ -204,6 +204,27 @@ HttpResponse http(const QByteArray &verb, const QUrl &url, const Headers &header
 }
 #endif
 
+// Attesa che non blocca l'interfaccia di OBS.
+void pauseMs(int ms)
+{
+	QEventLoop loop;
+	QTimer::singleShot(ms, &loop, &QEventLoop::quit);
+	loop.exec();
+}
+
+// Come http(), ma riprova (fino a 3 tentativi in tutto) se il server risponde con un errore
+// temporaneo 5xx. Da usare solo per richieste che si possono ripetere senza effetti collaterali.
+HttpResponse httpRetry(const QByteArray &verb, const QUrl &url, const Headers &headers = Headers(),
+		       const QByteArray &body = QByteArray())
+{
+	HttpResponse r = http(verb, url, headers, body);
+	for (int attempt = 1; attempt < 3 && r.status >= 500 && r.status < 600; ++attempt) {
+		pauseMs(1500 * attempt);
+		r = http(verb, url, headers, body);
+	}
+	return r;
+}
+
 QByteArray formBody(const QList<QPair<QString, QString>> &items)
 {
 	QByteArray out;
@@ -225,6 +246,17 @@ QString describeFailure(const HttpResponse &r)
 	if (r.status == 0)
 		return r.error.isEmpty() ? QString("Errore di rete") : r.error;
 	return QString("Errore %1: %2").arg(r.status).arg(QString::fromUtf8(r.body.left(250)));
+}
+
+// Messaggio per i passaggi di YouTube: dice quale passaggio e' fallito e spiega gli errori 5xx.
+QString youtubeFailure(const QString &step, const HttpResponse &r)
+{
+	if (r.status >= 500 && r.status < 600)
+		return QString("%1: YouTube non e' disponibile al momento (errore %2, anche dopo piu' tentativi). "
+			       "Riprova tra qualche minuto.")
+			.arg(step)
+			.arg(r.status);
+	return step + ": " + describeFailure(r);
 }
 
 QString idString(const QJsonValue &v)
@@ -453,9 +485,9 @@ Result updateYouTube(const StreamInfo &i)
 		q.addQueryItem("part", "id");
 		q.addQueryItem("broadcastStatus", status);
 		url.setQuery(q);
-		const HttpResponse r = http("GET", url, h);
+		const HttpResponse r = httpRetry("GET", url, h);
 		if (r.status != 200)
-			return {false, describeFailure(r)};
+			return {false, youtubeFailure("Ricerca della diretta", r)};
 		const QJsonArray items = r.json()["items"].toArray();
 		if (!items.isEmpty()) {
 			videoId = items.first().toObject()["id"].toString();
@@ -471,10 +503,10 @@ Result updateYouTube(const StreamInfo &i)
 	vq.addQueryItem("part", "snippet");
 	vq.addQueryItem("id", videoId);
 	vurl.setQuery(vq);
-	const HttpResponse cur = http("GET", vurl, h);
+	const HttpResponse cur = httpRetry("GET", vurl, h);
 	const QJsonArray vitems = cur.json()["items"].toArray();
 	if (cur.status != 200 || vitems.isEmpty())
-		return {false, "Video della diretta non trovato: " + describeFailure(cur)};
+		return {false, youtubeFailure("Lettura della diretta", cur)};
 	const QJsonObject old = vitems.first().toObject()["snippet"].toObject();
 
 	QJsonObject snippet;
@@ -498,10 +530,10 @@ Result updateYouTube(const StreamInfo &i)
 	purl.setQuery(pq);
 	Headers ph = h;
 	ph.emplaceBack("Content-Type", "application/json");
-	const HttpResponse r = http("PUT", purl, ph, jsonBody(body));
+	const HttpResponse r = httpRetry("PUT", purl, ph, jsonBody(body));
 	if (r.status == 200)
 		return {true, "Aggiornato"};
-	return {false, describeFailure(r)};
+	return {false, youtubeFailure("Aggiornamento della diretta", r)};
 }
 
 } // namespace
