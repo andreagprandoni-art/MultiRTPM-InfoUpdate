@@ -1,6 +1,8 @@
 // Licenza: GPL-2.0-or-later (come il template ufficiale dei plugin OBS)
 #include "services.hpp"
 
+#include "credentials.hpp"
+
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QDesktopServices>
@@ -240,12 +242,38 @@ QString randomToken(int bytes)
 	return QString::fromLatin1(raw.toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals));
 }
 
+// ----------------------------------------------------------- credenziali integrate
+QString builtInId(Platform p)
+{
+	switch (p) {
+	case Platform::Twitch:
+		return QString::fromLatin1(MSIP_TWITCH_CLIENT_ID);
+	case Platform::Kick:
+		return QString::fromLatin1(MSIP_KICK_CLIENT_ID);
+	case Platform::YouTube:
+		return QString::fromLatin1(MSIP_YOUTUBE_CLIENT_ID);
+	}
+	return QString();
+}
+
+QString builtInSecret(Platform p)
+{
+	switch (p) {
+	case Platform::Twitch:
+		return QString::fromLatin1(MSIP_TWITCH_CLIENT_SECRET);
+	case Platform::Kick:
+		return QString::fromLatin1(MSIP_KICK_CLIENT_SECRET);
+	case Platform::YouTube:
+		return QString::fromLatin1(MSIP_YOUTUBE_CLIENT_SECRET);
+	}
+	return QString();
+}
+
 // ------------------------------------------------------------------------ token
 HttpResponse tokenRequest(Platform p, QList<QPair<QString, QString>> items)
 {
-	const QJsonObject s = section(p);
-	items.emplaceBack("client_id", s["client_id"].toString());
-	const QString secret = s["client_secret"].toString();
+	items.emplaceBack("client_id", clientId(p));
+	const QString secret = clientSecret(p);
 	if (!secret.isEmpty())
 		items.emplaceBack("client_secret", secret);
 	return http("POST", QUrl(QString::fromLatin1(spec(p).tokenUrl)),
@@ -496,14 +524,20 @@ QString redirectUri(Platform p)
 	return QString("http://localhost:%1/callback/%2").arg(kPort).arg(QString::fromLatin1(spec(p).key));
 }
 
+bool hasBuiltInCredentials(Platform p)
+{
+	return !builtInId(p).isEmpty();
+}
+
+// Se il plugin ha le credenziali integrate usa quelle; altrimenti (build locale) quelle delle Impostazioni.
 QString clientId(Platform p)
 {
-	return section(p)["client_id"].toString();
+	return hasBuiltInCredentials(p) ? builtInId(p) : section(p)["client_id"].toString();
 }
 
 QString clientSecret(Platform p)
 {
-	return section(p)["client_secret"].toString();
+	return hasBuiltInCredentials(p) ? builtInSecret(p) : section(p)["client_secret"].toString();
 }
 
 void setCredentials(Platform p, const QString &id, const QString &secret)

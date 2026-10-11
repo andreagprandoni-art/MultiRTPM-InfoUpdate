@@ -4,12 +4,10 @@
 #include <algorithm>
 
 #include <QCheckBox>
-#include <QClipboard>
 #include <QComboBox>
 #include <QDialog>
 #include <QFormLayout>
 #include <QGroupBox>
-#include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QJsonArray>
@@ -24,17 +22,6 @@ namespace {
 
 const Platform kAll[kPlatformCount] = {Platform::Twitch, Platform::Kick, Platform::YouTube};
 
-QString joinHashtags(const QStringList &tags)
-{
-	QStringList out;
-	for (QString t : tags) {
-		t.remove(' ');
-		if (!t.isEmpty())
-			out << "#" + t;
-	}
-	return out.join(' ');
-}
-
 // ------------------------------------------------------------------ finestra impostazioni
 class SettingsDialog : public QDialog {
 public:
@@ -45,14 +32,16 @@ public:
 		auto *lay = new QVBoxLayout(this);
 
 		auto *intro = new QLabel(
-			"Per collegarti servono le credenziali di una \"app sviluppatore\" che crei tu su ogni "
-			"piattaforma (gratis, una volta sola). Nella guida del plugin trovi i passaggi.\n"
+			"Modalità sviluppatore: questa copia del plugin non ha le credenziali integrate per "
+			"alcune piattaforme. Inserisci quelle di una tua \"app sviluppatore\" (vedi MAINTAINER.md). "
 			"Come indirizzo di reindirizzamento (Redirect URI) usa quello indicato sotto.");
 		intro->setWordWrap(true);
 		lay->addWidget(intro);
 
 		for (int i = 0; i < kPlatformCount; ++i) {
 			const Platform p = kAll[i];
+			if (svc::hasBuiltInCredentials(p))
+				continue;
 			auto *box = new QGroupBox(svc::platformName(p), this);
 			auto *form = new QFormLayout(box);
 
@@ -80,7 +69,8 @@ public:
 		connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
 		connect(save, &QPushButton::clicked, this, [this]() {
 			for (int i = 0; i < kPlatformCount; ++i)
-				svc::setCredentials(kAll[i], m_id[i]->text(), m_secret[i]->text());
+				if (m_id[i])
+					svc::setCredentials(kAll[i], m_id[i]->text(), m_secret[i]->text());
 			accept();
 		});
 	}
@@ -123,9 +113,15 @@ void InfoPanel::buildUi()
 		pl->addLayout(row);
 		connect(m_connect[i], &QPushButton::clicked, this, [this, p]() { doConnect(p); });
 	}
-	auto *settingsBtn = new QPushButton("Impostazioni…", platforms);
-	connect(settingsBtn, &QPushButton::clicked, this, [this]() { openSettings(); });
-	pl->addWidget(settingsBtn);
+	bool needSettings = false;
+	for (const Platform pf : kAll)
+		if (!svc::hasBuiltInCredentials(pf))
+			needSettings = true;
+	if (needSettings) { // solo nelle build senza credenziali integrate (modalita' sviluppatore)
+		auto *settingsBtn = new QPushButton("Impostazioni…", platforms);
+		connect(settingsBtn, &QPushButton::clicked, this, [this]() { openSettings(); });
+		pl->addWidget(settingsBtn);
+	}
 	root->addWidget(platforms);
 
 	m_current = new QLabel(m_content);
@@ -245,27 +241,6 @@ void InfoPanel::buildUi()
 	m_results->setTextFormat(Qt::RichText);
 	m_results->setTextInteractionFlags(Qt::TextSelectableByMouse);
 	root->addWidget(m_results);
-
-	// --- TikTok (manuale)
-	auto *tiktok = new QGroupBox("TikTok (manuale)", m_content);
-	auto *tl = new QVBoxLayout(tiktok);
-	auto *note = new QLabel("TikTok non permette di cambiare titolo o categoria da programmi esterni: "
-				"copia qui e incolla in TikTok LIVE Studio.",
-				tiktok);
-	note->setWordWrap(true);
-	note->setStyleSheet("color: gray;");
-	tl->addWidget(note);
-	auto *trow = new QHBoxLayout();
-	auto *copyTitle = new QPushButton("Copia titolo", tiktok);
-	auto *copyTags = new QPushButton("Copia hashtag", tiktok);
-	trow->addWidget(copyTitle);
-	trow->addWidget(copyTags);
-	tl->addLayout(trow);
-	root->addWidget(tiktok);
-	connect(copyTitle, &QPushButton::clicked, this,
-		[this]() { QGuiApplication::clipboard()->setText(m_title->text().trimmed()); });
-	connect(copyTags, &QPushButton::clicked, this,
-		[this]() { QGuiApplication::clipboard()->setText(joinHashtags(collect().tags)); });
 
 	root->addStretch();
 }

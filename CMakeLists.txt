@@ -44,6 +44,31 @@ target_sources(
     src/services.hpp
 )
 
+# Credenziali delle app OAuth (Twitch, Kick, YouTube) integrate nel plugin.
+# Si passano come variabili d'ambiente MSIP_* in fase di build (in CI arrivano dai GitHub Secrets).
+set(MSIP_TWITCH_CLIENT_ID "$ENV{MSIP_TWITCH_CLIENT_ID}")
+set(MSIP_TWITCH_CLIENT_SECRET "$ENV{MSIP_TWITCH_CLIENT_SECRET}")
+set(MSIP_KICK_CLIENT_ID "$ENV{MSIP_KICK_CLIENT_ID}")
+set(MSIP_KICK_CLIENT_SECRET "$ENV{MSIP_KICK_CLIENT_SECRET}")
+set(MSIP_YOUTUBE_CLIENT_ID "$ENV{MSIP_YOUTUBE_CLIENT_ID}")
+set(MSIP_YOUTUBE_CLIENT_SECRET "$ENV{MSIP_YOUTUBE_CLIENT_SECRET}")
+foreach(
+  _var
+  MSIP_TWITCH_CLIENT_ID
+  MSIP_TWITCH_CLIENT_SECRET
+  MSIP_KICK_CLIENT_ID
+  MSIP_KICK_CLIENT_SECRET
+  MSIP_YOUTUBE_CLIENT_ID
+  MSIP_YOUTUBE_CLIENT_SECRET
+)
+  string(STRIP "${${_var}}" ${_var})
+  if(NOT "${${_var}}" MATCHES "^[A-Za-z0-9._~-]*$")
+    message(FATAL_ERROR "${_var} contiene caratteri non validi: ricopia il valore dal sito della piattaforma.")
+  endif()
+endforeach()
+configure_file(src/credentials.hpp.in "${CMAKE_CURRENT_BINARY_DIR}/generated/credentials.hpp" @ONLY)
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+
 if(WIN32)
   # Rete HTTPS tramite WinHTTP (il Qt di OBS non include il backend TLS)
   target_sources(${CMAKE_PROJECT_NAME} PRIVATE src/winhttp-client.cpp src/winhttp-client.hpp)

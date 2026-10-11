@@ -75,6 +75,14 @@ jobs:
     name: Build for Windows 🪟
     runs-on: windows-2022
     needs: check-event
+    env:
+      # Credenziali delle app OAuth: arrivano dai GitHub Secrets e finiscono dentro il plugin
+      MSIP_TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
+      MSIP_TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
+      MSIP_KICK_CLIENT_ID: ${{ secrets.KICK_CLIENT_ID }}
+      MSIP_KICK_CLIENT_SECRET: ${{ secrets.KICK_CLIENT_SECRET }}
+      MSIP_YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+      MSIP_YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
     defaults:
       run:
         shell: pwsh

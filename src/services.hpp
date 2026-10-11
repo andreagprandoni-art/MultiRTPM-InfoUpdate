@@ -43,6 +43,8 @@ QString clientId(Platform p);
 QString clientSecret(Platform p);
 void setCredentials(Platform p, const QString &clientId, const QString &clientSecret);
 
+// true se le credenziali dell'app OAuth sono gia' dentro il plugin (build di distribuzione).
+bool hasBuiltInCredentials(Platform p);
 bool isConfigured(Platform p);
 bool isConnected(Platform p);
 void disconnectAccount(Platform p);
