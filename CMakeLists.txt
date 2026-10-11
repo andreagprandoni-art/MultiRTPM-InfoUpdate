@@ -44,4 +44,10 @@ target_sources(
     src/services.hpp
 )
 
+if(WIN32)
+  # Rete HTTPS tramite WinHTTP (il Qt di OBS non include il backend TLS)
+  target_sources(${CMAKE_PROJECT_NAME} PRIVATE src/winhttp-client.cpp src/winhttp-client.hpp)
+  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE winhttp)
+endif()
+
 set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})

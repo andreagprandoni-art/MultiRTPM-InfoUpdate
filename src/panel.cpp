@@ -334,6 +334,7 @@ void InfoPanel::doConnect(Platform p)
 		refreshCurrent();
 	} else {
 		showLines({"✖ <b>" + svc::platformName(p) + "</b>: " + r.message.toHtmlEscaped()});
+		QMessageBox::warning(this, "Collegamento a " + svc::platformName(p), r.message);
 	}
 }
 

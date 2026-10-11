@@ -23,6 +23,16 @@
 #include <QUrl>
 #include <QUrlQuery>
 
+#include <atomic>
+#include <string>
+#include <thread>
+#include <utility>
+#include <vector>
+
+#if defined(_WIN32) || defined(MSIP_FORCE_WINHTTP)
+#include "winhttp-client.hpp"
+#endif
+
 namespace svc {
 namespace {
 
@@ -96,6 +106,53 @@ struct HttpResponse {
 	QJsonObject json() const { return QJsonDocument::fromJson(body).object(); }
 };
 
+#if defined(_WIN32) || defined(MSIP_FORCE_WINHTTP)
+// Su Windows usiamo WinHTTP (TLS di Windows): il Qt incluso in OBS non ha il backend TLS e
+// QNetworkAccessManager darebbe "TLS initialization failed". La richiesta gira in un thread
+// e intanto lasciamo lavorare l'interfaccia di OBS (event loop locale).
+HttpResponse http(const QByteArray &verb, const QUrl &url, const Headers &headers = Headers(),
+		  const QByteArray &body = QByteArray(), int timeoutMs = 15000)
+{
+	QString pathAndQuery = url.path(QUrl::FullyEncoded);
+	if (pathAndQuery.isEmpty())
+		pathAndQuery = "/";
+	if (url.hasQuery())
+		pathAndQuery += "?" + url.query(QUrl::FullyEncoded);
+
+	const std::string verbStd(verb.constData(), static_cast<size_t>(verb.size()));
+	const std::string hostStd = url.host().toUtf8().toStdString();
+	const std::string pathStd = pathAndQuery.toUtf8().toStdString();
+	const std::string bodyStd(body.constData(), static_cast<size_t>(body.size()));
+	const int port = url.port(443);
+	std::vector<std::pair<std::string, std::string>> headerList;
+	for (const auto &h : headers)
+		headerList.emplace_back(std::string(h.first.constData(), static_cast<size_t>(h.first.size())),
+					std::string(h.second.constData(), static_cast<size_t>(h.second.size())));
+
+	WinHttpResult res;
+	std::atomic<bool> done(false);
+	std::thread worker([&]() {
+		res = winhttpRequest(verbStd, hostStd, port, pathStd, headerList, bodyStd, timeoutMs);
+		done = true;
+	});
+
+	QEventLoop loop;
+	QTimer poll;
+	QObject::connect(&poll, &QTimer::timeout, &loop, [&]() {
+		if (done)
+			loop.quit();
+	});
+	poll.start(25);
+	loop.exec();
+	worker.join();
+
+	HttpResponse out;
+	out.status = res.status;
+	out.body = QByteArray(res.body.data(), static_cast<int>(res.body.size()));
+	out.error = QString::fromUtf8(res.error.c_str());
+	return out;
+}
+#else
 QNetworkAccessManager &manager()
 {
 	static QNetworkAccessManager *nam = nullptr;
@@ -106,7 +163,7 @@ QNetworkAccessManager &manager()
 	return *nam;
 }
 
-// Richiesta HTTP "bloccante" che pero' lascia lavorare l'interfaccia di OBS (event loop locale).
+// Richiesta HTTP "bloccante" che pero' lascia lavorare l'interfaccia (event loop locale).
 HttpResponse http(const QByteArray &verb, const QUrl &url, const Headers &headers = Headers(),
 		  const QByteArray &body = QByteArray(), int timeoutMs = 15000)
 {
@@ -143,6 +200,7 @@ HttpResponse http(const QByteArray &verb, const QUrl &url, const Headers &header
 	reply->deleteLater();
 	return out;
 }
+#endif
 
 QByteArray formBody(const QList<QPair<QString, QString>> &items)
 {
