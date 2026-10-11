@@ -251,6 +251,10 @@ QString describeFailure(const HttpResponse &r)
 // Messaggio per i passaggi di YouTube: dice quale passaggio e' fallito e spiega gli errori 5xx.
 QString youtubeFailure(const QString &step, const HttpResponse &r)
 {
+	if (r.status == 401 && r.body.contains("youtubeSignupRequired"))
+		return step + ": l'account Google scelto non ha un canale YouTube. Premi Scollega, poi Collega e "
+			      "scegli l'account (o il canale) che usi per le dirette. Se non hai ancora un canale, "
+			      "crealo su youtube.com.";
 	if (r.status >= 500 && r.status < 600)
 		return QString("%1: YouTube non e' disponibile al momento (errore %2, anche dopo piu' tentativi). "
 			       "Riprova tra qualche minuto.")
@@ -631,7 +635,7 @@ Result login(Platform p)
 	q.addQueryItem("state", state);
 	if (p == Platform::YouTube) {
 		q.addQueryItem("access_type", "offline");
-		q.addQueryItem("prompt", "consent");
+		q.addQueryItem("prompt", "select_account consent");
 	}
 	if (sp.pkce) {
 		verifier = randomToken(48);
