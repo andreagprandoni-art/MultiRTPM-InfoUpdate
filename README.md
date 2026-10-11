@@ -27,6 +27,19 @@ Si fa una volta sola. Con **Scollega** rimuovi l'accesso dal plugin.
 - **YouTube**: se Google mostra "app non verificata", clicca **Avanzate → Continua**.
 - Il login usa la porta **8426** del tuo computer: se un altro programma la occupa, il plugin te lo dice.
 
+## YouTube con la tua app Google (facoltativo)
+
+Di norma basta **Collega**. Se l'accesso con l'app del plugin non funziona, o se YouTube segnala che la quota
+giornaliera condivisa è esaurita, puoi usare una tua app Google (gratis):
+
+1. Su console.cloud.google.com crea un progetto e abilita **YouTube Data API v3**.
+2. Schermata consenso OAuth: tipo **Esterno**; aggiungi il tuo account Google tra gli **utenti di test**.
+3. Credenziali → **ID client OAuth** → tipo **App desktop**. Copia Client ID e Client secret.
+4. Nel pannello apri **Impostazioni avanzate (YouTube)…**, incolla i due valori, salva, poi premi **Collega**.
+
+Una "chiave API" semplice non basta: per modificare la tua diretta serve il login con il tuo account, quindi
+servono Client ID e Client secret. Per tornare all'app del plugin svuota i due campi e ricollega.
+
 ## Uso quotidiano
 
 1. Scrivi il **titolo**.

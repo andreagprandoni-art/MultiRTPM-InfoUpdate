@@ -43,6 +43,10 @@ QString clientId(Platform p);
 QString clientSecret(Platform p);
 void setCredentials(Platform p, const QString &clientId, const QString &clientSecret);
 
+// Credenziali inserite dall'utente nelle Impostazioni: se presenti hanno la precedenza su quelle integrate.
+QString customClientId(Platform p);
+QString customClientSecret(Platform p);
+
 // true se le credenziali dell'app OAuth sono gia' dentro il plugin (build di distribuzione).
 bool hasBuiltInCredentials(Platform p);
 bool isConfigured(Platform p);

@@ -31,22 +31,37 @@ public:
 		setMinimumWidth(520);
 		auto *lay = new QVBoxLayout(this);
 
+		bool missingBuiltIn = false;
+		for (const Platform pf : kAll)
+			if (!svc::hasBuiltInCredentials(pf))
+				missingBuiltIn = true;
 		auto *intro = new QLabel(
-			"Modalità sviluppatore: questa copia del plugin non ha le credenziali integrate per "
-			"alcune piattaforme. Inserisci quelle di una tua \"app sviluppatore\" (vedi MAINTAINER.md). "
-			"Come indirizzo di reindirizzamento (Redirect URI) usa quello indicato sotto.");
+			missingBuiltIn
+				? "Modalità sviluppatore: questa copia del plugin non ha le credenziali integrate per "
+				  "alcune piattaforme. Inserisci quelle di una tua \"app sviluppatore\" (vedi "
+				  "MAINTAINER.md). Come indirizzo di reindirizzamento (Redirect URI) usa quello indicato "
+				  "sotto."
+				: "Impostazioni avanzate. Per YouTube puoi usare una tua app Google (tipo \"App desktop\") "
+				  "al posto di quella del plugin: utile se la quota condivisa è esaurita o se l'accesso con "
+				  "l'app del plugin non funziona. Lascia i campi vuoti per usare quella del plugin. Dopo "
+				  "il salvataggio premi di nuovo Collega.");
 		intro->setWordWrap(true);
 		lay->addWidget(intro);
 
 		for (int i = 0; i < kPlatformCount; ++i) {
 			const Platform p = kAll[i];
-			if (svc::hasBuiltInCredentials(p))
+			// Le piattaforme con credenziali integrate non si configurano, tranne YouTube (facoltativo).
+			if (svc::hasBuiltInCredentials(p) && p != Platform::YouTube)
 				continue;
-			auto *box = new QGroupBox(svc::platformName(p), this);
+			const bool optional = svc::hasBuiltInCredentials(p);
+			auto *box = new QGroupBox(optional ? svc::platformName(p) + " - la tua app Google (facoltativo)"
+							   : svc::platformName(p),
+						  this);
 			auto *form = new QFormLayout(box);
 
-			m_id[i] = new QLineEdit(svc::clientId(p), box);
-			m_secret[i] = new QLineEdit(svc::clientSecret(p), box);
+			// Mostra solo quello che ha inserito l'utente, mai le credenziali integrate nel plugin.
+			m_id[i] = new QLineEdit(svc::customClientId(p), box);
+			m_secret[i] = new QLineEdit(svc::customClientSecret(p), box);
 			m_secret[i]->setEchoMode(QLineEdit::Password);
 			auto *uri = new QLineEdit(svc::redirectUri(p), box);
 			uri->setReadOnly(true);
@@ -117,11 +132,11 @@ void InfoPanel::buildUi()
 	for (const Platform pf : kAll)
 		if (!svc::hasBuiltInCredentials(pf))
 			needSettings = true;
-	if (needSettings) { // solo nelle build senza credenziali integrate (modalita' sviluppatore)
-		auto *settingsBtn = new QPushButton("Impostazioni…", platforms);
-		connect(settingsBtn, &QPushButton::clicked, this, [this]() { openSettings(); });
-		pl->addWidget(settingsBtn);
-	}
+	// Sempre disponibile: nelle build di distribuzione serve per usare una propria app Google su YouTube.
+	auto *settingsBtn = new QPushButton(needSettings ? "Impostazioni…" : "Impostazioni avanzate (YouTube)…",
+					    platforms);
+	connect(settingsBtn, &QPushButton::clicked, this, [this]() { openSettings(); });
+	pl->addWidget(settingsBtn);
 	root->addWidget(platforms);
 
 	m_current = new QLabel(m_content);

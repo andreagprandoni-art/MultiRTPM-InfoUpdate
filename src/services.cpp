@@ -565,21 +565,33 @@ bool hasBuiltInCredentials(Platform p)
 	return !builtInId(p).isEmpty();
 }
 
-// Se il plugin ha le credenziali integrate usa quelle; altrimenti (build locale) quelle delle Impostazioni.
+QString customClientId(Platform p)
+{
+	return section(p)["client_id"].toString();
+}
+
+QString customClientSecret(Platform p)
+{
+	return section(p)["client_secret"].toString();
+}
+
+// Hanno la precedenza le credenziali inserite dall'utente nelle Impostazioni (la sua app Google, ecc.);
+// se non ce ne sono si usano quelle integrate nel plugin.
 QString clientId(Platform p)
 {
-	return hasBuiltInCredentials(p) ? builtInId(p) : section(p)["client_id"].toString();
+	const QString custom = customClientId(p);
+	return custom.isEmpty() ? builtInId(p) : custom;
 }
 
 QString clientSecret(Platform p)
 {
-	return hasBuiltInCredentials(p) ? builtInSecret(p) : section(p)["client_secret"].toString();
+	return customClientId(p).isEmpty() ? builtInSecret(p) : customClientSecret(p);
 }
 
 void setCredentials(Platform p, const QString &id, const QString &secret)
 {
 	QJsonObject s = section(p);
-	if (s["client_id"].toString() != id) {
+	if (s["client_id"].toString() != id.trimmed()) {
 		// Un'altra app sviluppatore: i vecchi token non valgono piu'.
 		s.remove("access_token");
 		s.remove("refresh_token");
