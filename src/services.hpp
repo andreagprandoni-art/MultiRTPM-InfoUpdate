@@ -38,23 +38,26 @@ void setConfigDir(const QString &dir);
 QString platformName(Platform p);
 QString redirectUri(Platform p);
 
-// Credenziali dell'app sviluppatore create dall'utente su ogni piattaforma.
+// Cartella in cui sono salvati impostazioni e token.
+QString configDir();
+
+// Credenziali dell'app sviluppatore create dall'utente su ogni piattaforma (false = salvataggio fallito).
 QString clientId(Platform p);
 QString clientSecret(Platform p);
-void setCredentials(Platform p, const QString &clientId, const QString &clientSecret);
+bool setCredentials(Platform p, const QString &clientId, const QString &clientSecret);
 
-// Credenziali inserite dall'utente nelle Impostazioni: se presenti hanno la precedenza su quelle integrate.
-QString customClientId(Platform p);
-QString customClientSecret(Platform p);
-
-// true se le credenziali dell'app OAuth sono gia' dentro il plugin (build di distribuzione).
-bool hasBuiltInCredentials(Platform p);
 bool isConfigured(Platform p);
 bool isConnected(Platform p);
+
+// Nome dell'account/canale collegato, se noto (YouTube: nome del canale), altrimenti vuoto.
+QString accountLabel(Platform p);
 void disconnectAccount(Platform p);
 
 // Apre il browser per il login e attende il ritorno (massimo 3 minuti, l'interfaccia resta reattiva).
 Result login(Platform p);
+
+// Interrompe un login in corso (chiamabile mentre login() sta aspettando il browser).
+void cancelLogin();
 
 // Cerca categorie/giochi (solo Twitch e Kick).
 QList<Category> searchCategories(Platform p, const QString &query, QString *error);

@@ -7,7 +7,7 @@ descrizione della tua diretta su Twitch, Kick e YouTube.
 
 - **Nessun nostro server.** Il plugin comunica direttamente tra il tuo computer e Twitch, Kick e Google.
   Non raccogliamo, non riceviamo e non conserviamo alcun tuo dato.
-- **Cosa viene salvato sul tuo PC.** I token di accesso che le piattaforme rilasciano dopo il tuo login
+- **Cosa viene salvato sul tuo PC.** Il Client ID/Secret della tua app sviluppatore, i token di accesso che le piattaforme rilasciano dopo il tuo login
   e i preset che crei, in `%APPDATA%\obs-studio\plugin_config\multistream-info-panel\settings.json`.
   I token sono salvati in chiaro: non condividere quel file.
 - **Cosa viene letto e modificato.** Solo i dati del tuo canale necessari al plugin: titolo, categoria, tag,
@@ -19,7 +19,7 @@ descrizione della tua diretta su Twitch, Kick e YouTube.
 - **Come revocare l'accesso.** Nel pannello premi **Scollega** (rimuove i token dal PC), poi revoca il permesso:
   YouTube/Google → myaccount.google.com/permissions; Twitch → twitch.tv/settings/connections;
   Kick → impostazioni account, sezione app collegate.
-- **Contatti.** [INSERISCI QUI LA TUA EMAIL DI CONTATTO]
+- **Contatti.** apri una segnalazione (Issue) nel repository GitHub del plugin.
 
 ## English
 
@@ -28,7 +28,7 @@ description of your live stream on Twitch, Kick and YouTube.
 
 - **No server of ours.** The plugin talks directly between your computer and Twitch, Kick and Google.
   We do not collect, receive or store any of your data.
-- **What is stored on your PC.** The access tokens issued by the platforms after you sign in, and the presets you
+- **What is stored on your PC.** The Client ID/Secret of your own developer app, the access tokens issued by the platforms after you sign in, and the presets you
   create, in `%APPDATA%\obs-studio\plugin_config\multistream-info-panel\settings.json`. Tokens are stored in plain
   text: do not share that file.
 - **What is read and changed.** Only the channel data the plugin needs: stream title, category, tags, language
@@ -40,4 +40,4 @@ description of your live stream on Twitch, Kick and YouTube.
 - **How to revoke access.** Press **Scollega** (Disconnect) in the panel to remove the tokens from your PC, then revoke
   the permission: Google → myaccount.google.com/permissions; Twitch → twitch.tv/settings/connections;
   Kick → account settings, connected apps.
-- **Contact.** [PUT YOUR CONTACT EMAIL HERE]
+- **Contact.** open an Issue in the plugin's GitHub repository.

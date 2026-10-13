@@ -23,6 +23,7 @@ private:
 	void refreshCurrent();
 	void setBusy(bool busy);
 	void showLines(const QStringList &lines);
+	void copySupportInfo();
 
 	void doConnect(Platform p);
 	void doSearch();
@@ -53,4 +54,5 @@ private:
 	QPlainTextEdit *m_desc = nullptr;
 	QPushButton *m_go = nullptr;
 	QLabel *m_results = nullptr;
+	QString m_lastResults;
 };

@@ -3,7 +3,9 @@
 
 #include <algorithm>
 
+#include <QApplication>
 #include <QCheckBox>
+#include <QClipboard>
 #include <QComboBox>
 #include <QDialog>
 #include <QFormLayout>
@@ -15,8 +17,14 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QProgressDialog>
 #include <QPushButton>
+#include <QRegularExpression>
+#include <QTextDocumentFragment>
 #include <QVBoxLayout>
+
+#include <obs.h>
+#include <plugin-support.h>
 
 namespace {
 
@@ -28,47 +36,50 @@ public:
 	explicit SettingsDialog(QWidget *parent) : QDialog(parent)
 	{
 		setWindowTitle("Impostazioni - Info Live");
-		setMinimumWidth(520);
+		setMinimumWidth(560);
 		auto *lay = new QVBoxLayout(this);
 
-		bool missingBuiltIn = false;
-		for (const Platform pf : kAll)
-			if (!svc::hasBuiltInCredentials(pf))
-				missingBuiltIn = true;
 		auto *intro = new QLabel(
-			missingBuiltIn
-				? "Modalità sviluppatore: questa copia del plugin non ha le credenziali integrate per "
-				  "alcune piattaforme. Inserisci quelle di una tua \"app sviluppatore\" (vedi "
-				  "MAINTAINER.md). Come indirizzo di reindirizzamento (Redirect URI) usa quello indicato "
-				  "sotto."
-				: "Impostazioni avanzate. Per YouTube puoi usare una tua app Google (tipo \"App desktop\") "
-				  "al posto di quella del plugin: utile se la quota condivisa è esaurita o se l'accesso con "
-				  "l'app del plugin non funziona. Lascia i campi vuoti per usare quella del plugin. Dopo "
-				  "il salvataggio premi di nuovo Collega.");
+			"Per ogni piattaforma che vuoi usare crea una tua \"app sviluppatore\" (gratis, una volta sola: "
+			"la guida passo-passo è nel README del plugin) e incolla qui Client ID e Client Secret. "
+			"Come indirizzo di reindirizzamento (Redirect URI) usa esattamente quello indicato sotto. "
+			"Dopo il salvataggio premi Collega.",
+			this);
 		intro->setWordWrap(true);
 		lay->addWidget(intro);
 
+		const char *where[kPlatformCount] = {
+			"<a href=\"https://dev.twitch.tv/console\">dev.twitch.tv/console</a> · tipo client: Confidential",
+			"kick.com → Impostazioni → Developer · permessi: user:read, channel:read, channel:write",
+			"<a href=\"https://console.cloud.google.com/apis/credentials\">console.cloud.google.com</a> · "
+			"ID client OAuth di tipo \"App desktop\" · YouTube Data API v3 abilitata"};
+
 		for (int i = 0; i < kPlatformCount; ++i) {
 			const Platform p = kAll[i];
-			// Le piattaforme con credenziali integrate non si configurano, tranne YouTube (facoltativo).
-			if (svc::hasBuiltInCredentials(p) && p != Platform::YouTube)
-				continue;
-			const bool optional = svc::hasBuiltInCredentials(p);
-			auto *box = new QGroupBox(optional ? svc::platformName(p) + " - la tua app Google (facoltativo)"
-							   : svc::platformName(p),
-						  this);
+			auto *box = new QGroupBox(svc::platformName(p), this);
 			auto *form = new QFormLayout(box);
 
-			// Mostra solo quello che ha inserito l'utente, mai le credenziali integrate nel plugin.
-			m_id[i] = new QLineEdit(svc::customClientId(p), box);
-			m_secret[i] = new QLineEdit(svc::customClientSecret(p), box);
+			auto *hint = new QLabel(QString::fromUtf8(where[i]), box);
+			hint->setWordWrap(true);
+			hint->setOpenExternalLinks(true);
+			hint->setStyleSheet("color: gray;");
+			form->addRow(hint);
+
+			m_id[i] = new QLineEdit(svc::clientId(p), box);
+			m_secret[i] = new QLineEdit(svc::clientSecret(p), box);
 			m_secret[i]->setEchoMode(QLineEdit::Password);
 			auto *uri = new QLineEdit(svc::redirectUri(p), box);
 			uri->setReadOnly(true);
+			auto *copy = new QPushButton("Copia", box);
+			auto *uriRow = new QHBoxLayout();
+			uriRow->addWidget(uri, 1);
+			uriRow->addWidget(copy);
+			connect(copy, &QPushButton::clicked, this,
+				[uri]() { QApplication::clipboard()->setText(uri->text()); });
 
 			form->addRow("Client ID", m_id[i]);
 			form->addRow("Client Secret", m_secret[i]);
-			form->addRow("Redirect URI", uri);
+			form->addRow("Redirect URI", uriRow);
 			lay->addWidget(box);
 		}
 
@@ -82,15 +93,52 @@ public:
 		lay->addLayout(buttons);
 
 		connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
-		connect(save, &QPushButton::clicked, this, [this]() {
-			for (int i = 0; i < kPlatformCount; ++i)
-				if (m_id[i])
-					svc::setCredentials(kAll[i], m_id[i]->text(), m_secret[i]->text());
-			accept();
-		});
+		connect(save, &QPushButton::clicked, this, [this]() { onSave(); });
 	}
 
 private:
+	void onSave()
+	{
+		// Controlli semplici per gli errori di copia/incolla piu' comuni.
+		for (int i = 0; i < kPlatformCount; ++i) {
+			const QString id = m_id[i]->text().trimmed();
+			const QString secret = m_secret[i]->text().trimmed();
+			const QString name = svc::platformName(kAll[i]);
+			if (id.isEmpty() && secret.isEmpty())
+				continue;
+			if (id.contains(QRegularExpression("\\s"))) {
+				QMessageBox::warning(this, "Impostazioni", name + ": il Client ID contiene degli spazi.");
+				return;
+			}
+			if (secret.contains(QRegularExpression("\\s"))) {
+				QMessageBox::warning(this, "Impostazioni", name + ": il Client Secret contiene degli spazi.");
+				return;
+			}
+			if (id.isEmpty()) {
+				QMessageBox::warning(this, "Impostazioni", name + ": manca il Client ID.");
+				return;
+			}
+			if (kAll[i] != Platform::YouTube && secret.isEmpty()) {
+				QMessageBox::warning(this, "Impostazioni", name + ": manca il Client Secret.");
+				return;
+			}
+			if (kAll[i] == Platform::YouTube && !id.endsWith(".apps.googleusercontent.com") &&
+			    QMessageBox::question(this, "Impostazioni",
+						  "Il Client ID di YouTube di solito finisce con "
+						  ".apps.googleusercontent.com. Salvare comunque?") != QMessageBox::Yes)
+				return;
+		}
+		bool saved = true;
+		for (int i = 0; i < kPlatformCount; ++i)
+			saved = svc::setCredentials(kAll[i], m_id[i]->text(), m_secret[i]->text()) && saved;
+		if (!saved) {
+			QMessageBox::warning(this, "Impostazioni",
+					     "Non riesco a salvare le impostazioni in:\n" + svc::configDir());
+			return;
+		}
+		accept();
+	}
+
 	QLineEdit *m_id[kPlatformCount] = {};
 	QLineEdit *m_secret[kPlatformCount] = {};
 };
@@ -128,15 +176,14 @@ void InfoPanel::buildUi()
 		pl->addLayout(row);
 		connect(m_connect[i], &QPushButton::clicked, this, [this, p]() { doConnect(p); });
 	}
-	bool needSettings = false;
-	for (const Platform pf : kAll)
-		if (!svc::hasBuiltInCredentials(pf))
-			needSettings = true;
-	// Sempre disponibile: nelle build di distribuzione serve per usare una propria app Google su YouTube.
-	auto *settingsBtn = new QPushButton(needSettings ? "Impostazioni…" : "Impostazioni avanzate (YouTube)…",
-					    platforms);
+	auto *tools = new QHBoxLayout();
+	auto *settingsBtn = new QPushButton("Impostazioni (Client ID / Secret)…", platforms);
+	auto *supportBtn = new QPushButton("Copia info per supporto", platforms);
+	tools->addWidget(settingsBtn, 1);
+	tools->addWidget(supportBtn);
+	pl->addLayout(tools);
 	connect(settingsBtn, &QPushButton::clicked, this, [this]() { openSettings(); });
-	pl->addWidget(settingsBtn);
+	connect(supportBtn, &QPushButton::clicked, this, [this]() { copySupportInfo(); });
 	root->addWidget(platforms);
 
 	m_current = new QLabel(m_content);
@@ -235,6 +282,7 @@ void InfoPanel::buildUi()
 	m_lang = new QComboBox(m_content);
 	const QList<QPair<QString, QString>> langs = {{"Italiano", "it"}, {"English", "en"}, {"Español", "es"},
 						       {"Français", "fr"}, {"Deutsch", "de"}, {"Português", "pt"}};
+	m_lang->addItem("— non cambiare —", QString());
 	for (const auto &l : langs)
 		m_lang->addItem(l.first, l.second);
 	langRow->addRow("Lingua (Twitch)", m_lang);
@@ -257,6 +305,10 @@ void InfoPanel::buildUi()
 	m_results->setTextInteractionFlags(Qt::TextSelectableByMouse);
 	root->addWidget(m_results);
 
+	auto *version = new QLabel(QString("Info Live · versione %1").arg(QString::fromUtf8(PLUGIN_VERSION)), m_content);
+	version->setStyleSheet("color: gray;");
+	root->addWidget(version);
+
 	root->addStretch();
 }
 
@@ -266,8 +318,9 @@ void InfoPanel::refreshStatus()
 	for (int i = 0; i < kPlatformCount; ++i) {
 		const Platform p = kAll[i];
 		const bool connected = svc::isConnected(p);
-		m_status[i]->setText(connected ? "● collegato" : (svc::isConfigured(p) ? "○ non collegato"
-										      : "○ da configurare"));
+		const QString who = connected ? svc::accountLabel(p) : QString();
+		m_status[i]->setText(connected ? (who.isEmpty() ? QString("● collegato") : "● collegato · " + who)
+					       : (svc::isConfigured(p) ? "○ non collegato" : "○ da configurare"));
 		m_status[i]->setStyleSheet(connected ? "color: #3ecf8e;" : "color: gray;");
 		m_connect[i]->setText(connected ? "Scollega" : "Collega");
 		m_check[i]->setEnabled(connected);
@@ -298,6 +351,24 @@ void InfoPanel::setBusy(bool busy)
 void InfoPanel::showLines(const QStringList &lines)
 {
 	m_results->setText(lines.join("<br>"));
+	QTextDocumentFragment plain = QTextDocumentFragment::fromHtml(lines.join("\n"));
+	m_lastResults = plain.toPlainText();
+}
+
+void InfoPanel::copySupportInfo()
+{
+	QStringList out;
+	out << QString("Multistream Info Panel %1").arg(QString::fromUtf8(PLUGIN_VERSION));
+	out << QString("OBS %1 · Qt %2").arg(QString::fromUtf8(obs_get_version_string()), QString::fromLatin1(qVersion()));
+	out << "Cartella impostazioni: " + svc::configDir();
+	for (const Platform p : kAll)
+		out << QString("%1: %2, %3").arg(svc::platformName(p),
+						 svc::isConfigured(p) ? "credenziali inserite" : "credenziali mancanti",
+						 svc::isConnected(p) ? "collegato" : "non collegato");
+	if (!m_lastResults.trimmed().isEmpty())
+		out << "Ultimo messaggio: " + m_lastResults.trimmed();
+	QApplication::clipboard()->setText(out.join("\n"));
+	showLines({"Info copiate negli appunti (nessun token o segreto incluso): incollale dove chiedi aiuto."});
 }
 
 // ------------------------------------------------------------------------------ azioni
@@ -310,21 +381,38 @@ void InfoPanel::doConnect(Platform p)
 		return;
 	}
 	if (!svc::isConfigured(p)) {
-		showLines({"<b>" + svc::platformName(p) + "</b>: apri Impostazioni e inserisci Client ID e Secret."});
+		showLines({"<b>" + svc::platformName(p) + "</b>: inserisci Client ID e Client Secret, poi premi Collega."});
+		openSettings();
 		return;
 	}
-	setBusy(true);
 	showLines({"Completa il login nel browser che si è aperto… (massimo 3 minuti)"});
+
+	// Finestra modale con pulsante Annulla: blocca il pannello mentre aspettiamo il browser.
+	QProgressDialog wait("Completa il login di " + svc::platformName(p) + " nel browser che si è aperto…", "Annulla",
+			     0, 0, this);
+	wait.setWindowTitle("Collegamento a " + svc::platformName(p));
+	wait.setWindowModality(Qt::WindowModal);
+	wait.setMinimumDuration(0);
+	wait.setAutoClose(false);
+	wait.setAutoReset(false);
+	connect(&wait, &QProgressDialog::canceled, this, []() { svc::cancelLogin(); });
+	wait.show();
+
 	const Result r = svc::login(p);
-	setBusy(false);
+	wait.close();
 	refreshStatus();
 	if (r.ok) {
-		showLines({"✔ <b>" + svc::platformName(p) + "</b> collegato"});
+		const QString who = svc::accountLabel(p);
+		showLines({"✔ <b>" + svc::platformName(p) + "</b> collegato" +
+			   (who.isEmpty() ? QString() : " come <b>" + who.toHtmlEscaped() + "</b>")});
 		m_check[static_cast<int>(p)]->setChecked(true);
+		setBusy(true);
 		refreshCurrent();
+		setBusy(false);
 	} else {
 		showLines({"✖ <b>" + svc::platformName(p) + "</b>: " + r.message.toHtmlEscaped()});
-		QMessageBox::warning(this, "Collegamento a " + svc::platformName(p), r.message);
+		if (r.message != "Collegamento annullato")
+			QMessageBox::warning(this, "Collegamento a " + svc::platformName(p), r.message);
 	}
 }
 
@@ -410,9 +498,9 @@ void InfoPanel::doUpdate()
 		lines << QString(r.ok ? "✔ " : "✖ ") + "<b>" + svc::platformName(p) + "</b> — " +
 				 r.message.toHtmlEscaped();
 	}
-	setBusy(false);
 	showLines(lines);
 	refreshCurrent();
+	setBusy(false);
 }
 
 void InfoPanel::openSettings()

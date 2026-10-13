@@ -1,67 +1,106 @@
-# Multistream Info Panel
+# Multistream Info Panel — plugin per OBS Studio
 
-Plugin per **OBS Studio** (Windows) che aggiunge un pannello **"Info Live"**: da un solo posto aggiorni
-**titolo, categoria/gioco, tag, lingua e descrizione** della tua live su **Twitch, Kick e YouTube** con un clic.
+Un pannello **"Info Live"** dentro OBS per cambiare in un colpo solo **titolo, categoria/gioco, tag, lingua e descrizione**
+della tua diretta su **Twitch**, **Kick** e **YouTube**.
 
-- Accedi con il **tuo account** su ogni piattaforma, una sola volta: nessuna app o chiave da creare.
-- Salvi dei **preset** (es. uno per ogni gioco) e li richiami al volo.
-- Il plugin parla direttamente con Twitch, Kick e Google: nessun server intermedio.
+- Windows 64 bit, OBS Studio 31 o più recente.
+- Nessun nostro server: il plugin parla direttamente tra il tuo PC e le piattaforme.
+- Ogni utente collega **il proprio account** usando **una propria "app sviluppatore"** (gratis, si crea una volta sola:
+  guida qui sotto). Così nessuno condivide limiti o credenziali con altri.
 
-> Requisiti: OBS Studio 31 o successivo (64 bit) su Windows.
+## 1) Installazione
 
-## Installazione
+1. Scarica l'installer (`.exe`) o lo zip dalla pagina **Releases** del repository.
+2. Chiudi OBS, esegui l'installer (o copia il contenuto dello zip nella cartella di OBS, mantenendo le sottocartelle).
+3. Apri OBS → menu **Visualizza → Pannelli (Docks) → Info Live**.
 
-1. Scarica l'ultima versione dalla pagina **Releases** di questo repository.
-2. Chiudi OBS.
-3. **Con l'installer `.exe`**: avvialo. **Con lo zip**: estrailo dentro la cartella di OBS
-   (di solito `C:\Program Files\obs-studio`), in modo che i file finiscano in `obs-plugins\64bit\`
-   e `data\obs-plugins\`.
-4. Apri OBS → menu **Docks** → attiva **Info Live**. Il pannello si può spostare e agganciare dove vuoi.
+## 2) Crea le tue app (una volta sola, solo per le piattaforme che usi)
 
-## Primo accesso
+In tutte e tre c'è un campo **Redirect URI** (indirizzo di reindirizzamento): usa **esattamente** questi valori,
+carattere per carattere, senza barra finale e senza spazi.
 
-Nel pannello, accanto a ogni piattaforma, premi **Collega**: si apre il browser, accedi col tuo account
-e accetta i permessi. Quando vedi "Collegato!" torna a OBS: il pallino diventa verde.
-Si fa una volta sola. Con **Scollega** rimuovi l'accesso dal plugin.
+| Piattaforma | Redirect URI |
+|---|---|
+| Twitch | `http://localhost:8426/callback/twitch` |
+| Kick | `http://localhost:8426/callback/kick` |
+| YouTube | `http://localhost:8426/callback/youtube` (se la tua app Google è di tipo "App desktop" non serve inserirlo) |
 
-- **YouTube**: se Google mostra "app non verificata", clicca **Avanzate → Continua**.
-- Il login usa la porta **8426** del tuo computer: se un altro programma la occupa, il plugin te lo dice.
+(Le stesse stringhe si copiano dal pulsante **Copia** nelle Impostazioni del plugin.)
 
-## YouTube con la tua app Google (facoltativo)
+### Twitch
+1. Vai su <https://dev.twitch.tv/console> e accedi (Twitch può chiedere di attivare l'autenticazione a due fattori).
+2. **Register Your Application** → un nome a piacere, **OAuth Redirect URLs** = il valore della tabella,
+   **Category** = Application Integration, **Client Type** = **Confidential**.
+3. Apri l'app con **Manage**: copia il **Client ID** e premi **New Secret** per ottenere il **Client Secret**.
 
-Di norma basta **Collega**. Se l'accesso con l'app del plugin non funziona, o se YouTube segnala che la quota
-giornaliera condivisa è esaurita, puoi usare una tua app Google (gratis):
+### Kick
+1. Su kick.com apri **Impostazioni → Developer** (può servire l'autenticazione a due fattori) e crea una nuova app.
+2. Come Redirect URL usa il valore della tabella. Attiva i permessi `user:read`, `channel:read`, `channel:write`.
+3. Copia **Client ID** e **Client Secret**.
 
-1. Su console.cloud.google.com crea un progetto e abilita **YouTube Data API v3**.
-2. Schermata consenso OAuth: tipo **Esterno**; aggiungi il tuo account Google tra gli **utenti di test**.
-3. Credenziali → **ID client OAuth** → tipo **App desktop**. Copia Client ID e Client secret.
-4. Nel pannello apri **Impostazioni avanzate (YouTube)…**, incolla i due valori, salva, poi premi **Collega**.
+### YouTube (Google)
+1. Vai su <https://console.cloud.google.com> e crea un **nuovo progetto**.
+2. **API e servizi → Libreria** → cerca **YouTube Data API v3** → **Abilita**.
+3. **Schermata consenso OAuth** (o "Google Auth Platform"): tipo **Esterno**, compila nome app ed email.
+   Se l'app resta in stato **Test**: aggiungi il tuo indirizzo tra gli **Utenti di test**, ma tieni presente che in questo
+   stato il collegamento **scade dopo 7 giorni**. Per un uso duraturo premi **Pubblica app**
+   (per uso personale non serve la verifica Google: vedrai solo l'avviso "app non verificata", scegli *Avanzate → Continua*).
+4. **Credenziali → Crea credenziali → ID client OAuth** → tipo **App desktop**. Copia **Client ID** e **Client Secret**.
+5. **Account brand:** se il tuo canale è un account "brand", al login Google mostra un elenco di account/canali (o il
+   passaggio "Scegli un canale"): scegli **il canale del brand**, non l'account personale (che non ha un canale e dà
+   `youtubeSignupRequired`). Dopo il collegamento il plugin scrive il **nome del canale** collegato: controlla che sia quello giusto.
+   Il tuo account Google deve essere tra i gestori del brand account.
 
-Una "chiave API" semplice non basta: per modificare la tua diretta serve il login con il tuo account, quindi
-servono Client ID e Client secret. Per tornare all'app del plugin svuota i due campi e ricollega.
+## 3) Primo collegamento
 
-## Uso quotidiano
+1. Nel pannello premi **Impostazioni (Client ID / Secret)…**, incolla i dati delle piattaforme che usi e **Salva**.
+2. Premi **Collega** accanto alla piattaforma: si apre il browser, accetti, e torni su OBS. Compare "● collegato".
+   Puoi annullare l'attesa con **Annulla**.
+3. Spunta le piattaforme da aggiornare, scrivi titolo/categoria/tag e premi **Aggiorna le piattaforme selezionate**.
 
-1. Scrivi il **titolo**.
-2. Scrivi il gioco in **Categoria** e premi *Cerca*: scegli la voce giusta per Twitch e per Kick
-   (YouTube ha una lista fissa).
-3. Aggiungi tag, lingua (Twitch) e descrizione (YouTube).
-4. Spunta le piattaforme e premi **Aggiorna le piattaforme selezionate**: sotto vedi l'esito di ognuna.
-5. **Preset**: *Salva…* memorizza tutto il modulo; scegli un preset dal menu per ricaricarlo.
+Note d'uso:
+- **YouTube** aggiorna la diretta **attiva** o, se non c'è, la prossima **programmata**: creala prima in YouTube Studio.
+- **Categoria**: cerca per nome (Twitch e Kick). Per YouTube c'è un elenco fisso di categorie.
+- **Tag**: separati da virgola. Se il campo è vuoto i tag esistenti **non** vengono toccati.
+- **Lingua**: "— non cambiare —" lascia invariata quella attuale (vale solo per Twitch).
+- **Descrizione**: solo YouTube. Se vuota, non viene toccata.
+- **Preset**: salva e richiama combinazioni di campi (es. uno per gioco).
+- **Quota YouTube**: ogni aggiornamento costa circa 52 delle 10.000 unità giornaliere **del tuo progetto Google**
+  (≈ 190 aggiornamenti al giorno, abbondanti per un uso normale).
 
-## Cose da sapere
+## 4) Se qualcosa non funziona
 
-- **YouTube**: la diretta deve già esistere (attiva o programmata in YouTube Studio): il plugin modifica quella.
-  Se la descrizione è vuota resta quella attuale.
-- **Twitch**: titolo max 140 caratteri; tag max 10, senza spazi né simboli (li pulisce il plugin).
-  **Kick**: titolo max 140 caratteri.
-- Durante un login o un aggiornamento il pannello resta fermo qualche secondo: è normale.
-- Se un aggiornamento fallisce, sotto il pulsante vedi il motivo.
-- Il plugin salva i tuoi accessi **solo sul tuo PC** (`%APPDATA%\obs-studio\plugin_config\multistream-info-panel\settings.json`).
-  Non condividere mai quel file. Vedi anche [PRIVACY.md](PRIVACY.md).
+Premi **Copia info per supporto** nel pannello e incolla il testo quando chiedi aiuto (non contiene token né segreti).
 
-## Per chi mantiene il progetto
+| Messaggio | Cosa fare |
+|---|---|
+| `youtubeSignupRequired` / "non ha un canale YouTube" | Google ti ha collegato con l'account personale e non con il canale. **Scollega**, poi **Collega** e, quando Google lo chiede, scegli il **canale del brand**. |
+| `quotaExceeded` / "quota esaurita" | Hai usato le 10.000 unità del giorno: si azzerano a mezzanotte (fuso del Pacifico). |
+| `accessNotConfigured` / "API non abilitata" | Nel progetto Google abilita **YouTube Data API v3** (passo 2 della guida YouTube). |
+| `access_denied` su YouTube | App in stato Test: aggiungi il tuo account tra gli **Utenti di test**, oppure **Pubblica app**. |
+| "Sessione scaduta" dopo pochi giorni (YouTube) | App Google ancora in stato Test (scade dopo 7 giorni): **Pubblica app**, poi Scollega e Collega. |
+| `redirect_uri` non valido / mismatch | Il Redirect URI nell'app non è identico a quello della tabella. Copialo di nuovo. |
+| `invalid_client` | Client ID o Client Secret sbagliati o con spazi. Ricontrollali nelle Impostazioni. |
+| "La porta 8426 è occupata" | Chiudi altre copie di OBS o programmi che usano quella porta, poi riprova. |
+| "Nessuna diretta YouTube attiva o programmata" | Crea o programma la diretta in YouTube Studio, poi riprova. |
+| "nessuna risposta da …" | Rete, antivirus o proxy che bloccano OBS. Riprova; controlla che OBS possa accedere a Internet. |
+| 5xx / "non disponibile" | Problema temporaneo della piattaforma: il plugin ha già riprovato 3 volte. Aspetta qualche minuto. |
 
-Guida alla build, ai GitHub Secrets, alle release e ai limiti di distribuzione: [MAINTAINER.md](MAINTAINER.md).
+## Dove sono salvati i dati
 
-Basato su [obs-plugintemplate](https://github.com/obsproject/obs-plugintemplate). Licenza: GPL-2.0-or-later.
+In `%APPDATA%\obs-studio\plugin_config\multistream-info-panel\settings.json`: i tuoi Client ID/Secret, i token di accesso e i
+preset. **I token sono in chiaro: non condividere quel file.** Il salvataggio è "atomico" e, se il file si rovina,
+ne resta una copia `settings.json.bak`. **Scollega** rimuove i token dal PC; per revocare del tutto il permesso:
+Google → myaccount.google.com/permissions · Twitch → twitch.tv/settings/connections · Kick → impostazioni, app collegate.
+
+Vedi anche [PRIVACY.md](PRIVACY.md). TikTok non è supportato (non esiste un'API pubblica per cambiare titolo e categoria).
+
+## Compilare da sé (GitHub Actions)
+
+1. Carica il progetto su un repository GitHub (la cartella `.github/` deve esserci).
+2. Per una versione scaricabile: **Releases → Draft a new release**, crea un tag uguale alla `version` di `buildspec.json`
+   (es. `2.0.0`) e pubblica. La build parte da sola e allega zip e installer (come bozza: aprila e premi *Publish*).
+   In alternativa **Actions → dispatch → Run workflow** per una build manuale.
+3. Non servono Secrets: le credenziali le inserisce ogni utente nel plugin.
+
+Licenza: GPL-2.0-or-later (come il template ufficiale dei plugin OBS).

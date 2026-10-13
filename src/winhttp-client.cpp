@@ -22,20 +22,6 @@ std::wstring widen(const std::string &s)
 	return w;
 }
 
-// Verifica se la porta è occupata prima di tentare di collegare
-bool isPortInUse(int port)
-{
-	HINTERNET h = WinHttpOpen(L"MultistreamInfoPanel/1.0", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
-		WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
-	if (!h) return false;
-
-	const std::wstring widePort = std::to_string(port);
-	HINTERNET conn = WinHttpConnect(h, L"127.0.0.1", static_cast<INTERNET_PORT>(port), 0);
-	WinHttpCloseHandle(conn);
-	WinHttpCloseHandle(h);
-	return false; // Se non ci's un error, la porta è libera
-}
-
 // Chiude da solo l'handle WinHTTP.
 struct Handle {
 	HINTERNET h;
@@ -47,35 +33,49 @@ struct Handle {
 	}
 	Handle(const Handle &) = delete;
 	Handle &operator=(const Handle &) = delete;
- bool ok() const { return h != nullptr; }
+	bool ok() const { return h != nullptr; }
 };
+
+#ifdef WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3
+constexpr DWORD kTls13 = WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3;
+#else
+constexpr DWORD kTls13 = 0x00002000;
+#endif
 
 std::string failure(const char *step)
 {
 	return std::string("Errore di rete (") + step + ", codice " + std::to_string(GetLastError()) + ")";
 }
 
+} // namespace
+
 WinHttpResult winhttpRequest(const std::string &verb, const std::string &host, int port,
-					const std::string &pathAndQuery,
-					const std::vector<std::pair<std::string, std::string>> &headers,
-					const std::string &body, int timeoutMs)
+			     const std::string &pathAndQuery,
+			     const std::vector<std::pair<std::string, std::string>> &headers,
+			     const std::string &body, int timeoutMs)
 {
 	WinHttpResult out;
-	out.status = 0;
 
-	if (isPortInUse(port)) {
-		out.error = "La porta " + std::to_string(port) + " e' occupata. Verifica che non ci sia un'altra applicazione in uso.";
-		return out;
+	Handle session(WinHttpOpen(L"MultistreamInfoPanel/2.0", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+				   WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0));
+	if (!session.ok()) {
+		// Windows piu' vecchi senza rilevamento automatico del proxy.
+		session.h = WinHttpOpen(L"MultistreamInfoPanel/2.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+					WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
 	}
-
-	Handle session(WinHttpOpen(L"MultistreamInfoPanel/1.0", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
-			WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0));
 	if (!session.ok()) {
 		out.error = failure("apertura sessione");
 		return out;
 	}
+	WinHttpSetTimeouts(session.h, timeoutMs, timeoutMs, timeoutMs, timeoutMs);
 
-	WinHttpSetTimeouts(session.h, timeoutMs, timeoutMs, timeoutMs, timeoutMs); // connect, receive, send, read timeouts
+	// Protocolli TLS: forziamo TLS 1.2 (e 1.3 se Windows lo supporta). Se l'opzione non e' accettata
+	// si lasciano i valori predefiniti di Windows.
+	DWORD protocols = WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2 | kTls13;
+	if (!WinHttpSetOption(session.h, WINHTTP_OPTION_SECURE_PROTOCOLS, &protocols, sizeof(protocols))) {
+		protocols = WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2;
+		WinHttpSetOption(session.h, WINHTTP_OPTION_SECURE_PROTOCOLS, &protocols, sizeof(protocols));
+	}
 
 	const std::wstring wideHost = widen(host);
 	Handle connection(WinHttpConnect(session.h, wideHost.c_str(), static_cast<INTERNET_PORT>(port), 0));
@@ -87,7 +87,7 @@ WinHttpResult winhttpRequest(const std::string &verb, const std::string &host, i
 	const std::wstring wideVerb = widen(verb);
 	const std::wstring widePath = widen(pathAndQuery);
 	Handle request(WinHttpOpenRequest(connection.h, wideVerb.c_str(), widePath.c_str(), nullptr,
-						WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE));
+					  WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE));
 	if (!request.ok()) {
 		out.error = failure("creazione richiesta");
 		return out;
@@ -98,25 +98,21 @@ WinHttpResult winhttpRequest(const std::string &verb, const std::string &host, i
 		headerBlock += widen(h.first) + L": " + widen(h.second) + L"\r\n";
 	if (!headerBlock.empty())
 		WinHttpAddRequestHeaders(request.h, headerBlock.c_str(), static_cast<DWORD>(-1L),
-				WINHTTP_ADDREQ_FLAG_ADD | WINHTTP_ADDREQ_FLAG_REPLACE);
+					 WINHTTP_ADDREQ_FLAG_ADD | WINHTTP_ADDREQ_FLAG_REPLACE);
 
 	LPVOID data = body.empty() ? WINHTTP_NO_REQUEST_DATA : const_cast<char *>(body.data());
 	const DWORD length = static_cast<DWORD>(body.size());
 	if (!WinHttpSendRequest(request.h, WINHTTP_NO_ADDITIONAL_HEADERS, 0, data, length, length, 0) ||
-		!WinHttpReceiveResponse(request.h, nullptr)) {
+	    !WinHttpReceiveResponse(request.h, nullptr)) {
 		out.error = failure("invio richiesta");
 		return out;
 	}
 
- DWORD status = 0;
- DWORD statusSize = sizeof(status);
-	if (WinHttpQueryHeaders(request.h, WINHTTP_QUERY_STATUS_CODE | WINHTTP_FLAG_NUMBER,
-			WINHTTP_HEADER_NAME_BY_INDEX, &status, &statusSize, WINHTTP_NO_HEADER_INDEX)) {
-		out.status = static_cast<int>(status);
-	} else {
-		// Se non ci's un status, assumiamo 0
-		return out;
-	}
+	DWORD status = 0;
+	DWORD statusSize = sizeof(status);
+	WinHttpQueryHeaders(request.h, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+			    WINHTTP_HEADER_NAME_BY_INDEX, &status, &statusSize, WINHTTP_NO_HEADER_INDEX);
+	out.status = static_cast<int>(status);
 
 	for (;;) {
 		DWORD available = 0;
@@ -128,13 +124,5 @@ WinHttpResult winhttpRequest(const std::string &verb, const std::string &host, i
 			break;
 		out.body.append(chunk, 0, read);
 	}
-
-	// Se il status è 429 Too Many Requests, ritorna con un indicativo speciale
-	if (out.status == 429) {
-		out.error = "Rate limit exceeded. Ripeti dopo circa 60 secondi.";
-	} else if (out.status == 503) {
-		out.error = "Service Unavailable. Ripeti in pochi secondi.";
-	}
-
 	return out;
 }
