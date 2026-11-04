@@ -54,11 +54,11 @@ inserire il proprio username e la propria API key Euler Stream, salvarli
 localmente, rimuoverli o aprire TikTok LIVE nel browser. Non esiste alcuno
 username predefinito e la configurazione è indipendente da Twitch/Kick.
 
-**Limiti attuali:** questa versione NON autentica l'account TikTok, NON chiama
-ancora Euler Stream e NON aggiorna titolo o categoria TikTok. Una chiave Euler
+**Limiti attuali:** questa versione NON autentica l'account TikTok, può verificare la API key con una richiesta di sola lettura a Euler Stream,
+ma NON aggiorna titolo o categoria TikTok. Una chiave Euler
 Stream non equivale a un token OAuth TikTok. Le funzionalità di lettura dello
 stato LIVE saranno abilitate soltanto dopo verifica dell'endpoint e dei limiti
-Free; le modifiche LIVE richiedono un endpoint di scrittura autorizzato.
+Free; le modifiche LIVE richiedono un endpoint di scrittura autorizzato. Il pulsante "Verifica Euler API" consulta il profilo pubblico tramite `/tiktok/users/{unique_id}/basic` e non prova che l’utente possieda l’account TikTok.
 
 **Attenzione alla sicurezza:** la chiave Euler viene al momento salvata in
 chiaro nel file locale `tiktok-euler.json` nella cartella di configurazione del
