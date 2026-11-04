@@ -60,7 +60,4 @@ Stream non equivale a un token OAuth TikTok. Le funzionalità di lettura dello
 stato LIVE saranno abilitate soltanto dopo verifica dell'endpoint e dei limiti
 Free; le modifiche LIVE richiedono un endpoint di scrittura autorizzato. Il pulsante "Verifica Euler API" consulta il profilo pubblico tramite `/tiktok/users/{unique_id}/basic` e non prova che l’utente possieda l’account TikTok.
 
-**Attenzione alla sicurezza:** la chiave Euler viene al momento salvata in
-chiaro nel file locale `tiktok-euler.json` nella cartella di configurazione del
-plugin. Non condividere questo file e non usarlo su PC condivisi. La migrazione
-a un archivio credenziali di sistema è necessaria prima della release pubblica.
+**Attenzione alla sicurezza:** la chiave Euler Stream non viene salvata su disco: deve essere reinserita a ogni avvio di OBS. Solo lo username viene salvato in `tiktok-euler.json`. Se una versione precedente del plugin aveva salvato una chiave in chiaro, premi “Salva username” per riscrivere il file senza la chiave.
