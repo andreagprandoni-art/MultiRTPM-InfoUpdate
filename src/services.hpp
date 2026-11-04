@@ -66,6 +66,9 @@ Result updateChannel(Platform p, const StreamInfo &info);
 // Informazioni attuali del canale (best effort), es. "«titolo» · categoria".
 QString currentSummary(Platform p);
 
+// Verifica l'account TikTok tramite endpoint pubblico Euler Stream (sola lettura).
+Result verifyTikTokEuler(const QString &username, const QString &apiKey);
+
 // Preset salvati dall'utente.
 QJsonObject presets();
 void savePreset(const QString &name, const QJsonObject &data);
