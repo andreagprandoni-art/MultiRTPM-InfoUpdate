@@ -213,8 +213,10 @@ void InfoPanel::buildUi()
 	auto *tiktokActions = new QHBoxLayout();
 	auto *tiktokSave = new QPushButton("Salva configurazione", tiktokBox);
 	auto *tiktokClear = new QPushButton("Rimuovi account", tiktokBox);
+	auto *tiktokVerify = new QPushButton("Verifica Euler API", tiktokBox);
 	auto *tiktokOpen = new QPushButton("Apri TikTok LIVE", tiktokBox);
 	tiktokActions->addWidget(tiktokSave);
+	tiktokActions->addWidget(tiktokVerify);
 	tiktokActions->addWidget(tiktokClear);
 	tiktokActions->addWidget(tiktokOpen);
 	tiktokLayout->addLayout(tiktokActions);
@@ -242,6 +244,12 @@ void InfoPanel::buildUi()
 			return;
 		}
 		showLines({"TikTok: configurazione locale salvata. Nessun login o aggiornamento LIVE eseguito."});
+	});
+	connect(tiktokVerify, &QPushButton::clicked, this, [this, tiktokUser, eulerKey]() {
+		setBusy(true);
+		const Result r = svc::verifyTikTokEuler(tiktokUser->text(), eulerKey->text());
+		setBusy(false);
+		showLines({QString(r.ok ? "✔ " : "✖ ") + r.message.toHtmlEscaped()});
 	});
 	connect(tiktokClear, &QPushButton::clicked, this, [this, tiktokUser, eulerKey, tiktokPath]() {
 		if (QFile::exists(tiktokPath) && !QFile::remove(tiktokPath)) {
