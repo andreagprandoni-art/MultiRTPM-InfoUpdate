@@ -207,11 +207,11 @@ void InfoPanel::buildUi()
 		if (f.open(QIODevice::ReadOnly)) {
 			const auto obj = QJsonDocument::fromJson(f.readAll()).object();
 			tiktokUser->setText(obj.value("username").toString());
-			eulerKey->setText(obj.value("api_key").toString());
+			// Never load a plaintext API key from disk. Enter it for this session only.
 		}
 	}
 	auto *tiktokActions = new QHBoxLayout();
-	auto *tiktokSave = new QPushButton("Salva configurazione", tiktokBox);
+	auto *tiktokSave = new QPushButton("Salva username", tiktokBox);
 	auto *tiktokClear = new QPushButton("Rimuovi account", tiktokBox);
 	auto *tiktokVerify = new QPushButton("Verifica Euler API", tiktokBox);
 	auto *tiktokOpen = new QPushButton("Apri TikTok LIVE", tiktokBox);
@@ -227,13 +227,9 @@ void InfoPanel::buildUi()
 			QMessageBox::warning(this, "TikTok", "Inserisci uno username TikTok valido.");
 			return;
 		}
-		if (eulerKey->text().trimmed().isEmpty()) {
-			QMessageBox::warning(this, "TikTok", "Inserisci la tua API key Euler Stream.");
-			return;
-		}
 		QJsonObject obj;
 		obj["username"] = username;
-		obj["api_key"] = eulerKey->text().trimmed();
+		// API key is intentionally kept only in the password field for this OBS session.
 		if (!QDir().mkpath(svc::configDir())) {
 			QMessageBox::warning(this, "TikTok", "Impossibile creare la cartella impostazioni.");
 			return;
@@ -243,7 +239,7 @@ void InfoPanel::buildUi()
 			QMessageBox::warning(this, "TikTok", "Impossibile salvare la configurazione.");
 			return;
 		}
-		showLines({"TikTok: configurazione locale salvata. Nessun login o aggiornamento LIVE eseguito."});
+		showLines({"TikTok: username salvato. La API key resta solo in memoria fino alla chiusura di OBS. Nessun login TikTok eseguito."});
 	});
 	connect(tiktokVerify, &QPushButton::clicked, this, [this, tiktokUser, eulerKey]() {
 		setBusy(true);
