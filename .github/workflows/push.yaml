@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - main
+      - feature/public-multiuser-tiktok-design
       - 'release/**'
     tags:
       - '*'
