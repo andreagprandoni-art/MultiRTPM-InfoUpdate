@@ -47,3 +47,20 @@ Il plugin non supporta l'avvio del flusso video né la chat unificata.
 Il file `%APPDATA%\obs-studio\plugin_config\multistream-info-panel\settings.json` contiene Client Secret e token in **chiaro**; non condividerlo. Questa versione ignora i dati YouTube dei file preesistenti, senza eliminarli automaticamente. Per cancellarli in sicurezza fai backup, chiudi OBS ed elimina la sezione `youtube` dal JSON. Leggi [PRIVACY.md](PRIVACY.md).
 
 Compilazione tramite GitHub Actions o con CMake, Qt 6 e SDK OBS come nel repository originale. Licenza: GPL-2.0-or-later.
+
+## TikTok LIVE (anteprima multiutente)
+Il pannello include una sezione **TikTok LIVE (Euler Stream)**: ciascun utente può
+inserire il proprio username e la propria API key Euler Stream, salvarli
+localmente, rimuoverli o aprire TikTok LIVE nel browser. Non esiste alcuno
+username predefinito e la configurazione è indipendente da Twitch/Kick.
+
+**Limiti attuali:** questa versione NON autentica l'account TikTok, NON chiama
+ancora Euler Stream e NON aggiorna titolo o categoria TikTok. Una chiave Euler
+Stream non equivale a un token OAuth TikTok. Le funzionalità di lettura dello
+stato LIVE saranno abilitate soltanto dopo verifica dell'endpoint e dei limiti
+Free; le modifiche LIVE richiedono un endpoint di scrittura autorizzato.
+
+**Attenzione alla sicurezza:** la chiave Euler viene al momento salvata in
+chiaro nel file locale `tiktok-euler.json` nella cartella di configurazione del
+plugin. Non condividere questo file e non usarlo su PC condivisi. La migrazione
+a un archivio credenziali di sistema è necessaria prima della release pubblica.
