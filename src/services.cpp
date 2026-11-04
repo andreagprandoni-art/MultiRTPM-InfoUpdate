@@ -2,7 +2,7 @@
 #include "services.hpp"
 
 #include <plugin-support.h>
-#include <util/base.h>
+// plugin-support.h declares blogva; avoid the conflicting OBS util/base.h declaration.
 
 #include <QCryptographicHash>
 #include <QDateTime>
