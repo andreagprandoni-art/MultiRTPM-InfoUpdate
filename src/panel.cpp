@@ -8,6 +8,12 @@
 #include <QClipboard>
 #include <QComboBox>
 #include <QDialog>
+#include <QDesktopServices>
+#include <QUrl>
+#include <QFile>
+#include <QSaveFile>
+#include <QJsonDocument>
+#include <QDir>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -178,6 +184,78 @@ void InfoPanel::buildUi()
 	connect(settingsBtn, &QPushButton::clicked, this, [this]() { openSettings(); });
 	connect(supportBtn, &QPushButton::clicked, this, [this]() { copySupportInfo(); });
 	root->addWidget(platforms);
+
+	// TikTok configuration is per OBS installation. Euler API access is NOT TikTok OAuth.
+	auto *tiktokBox = new QGroupBox("TikTok LIVE (Euler Stream · configurazione locale)", m_content);
+	auto *tiktokLayout = new QVBoxLayout(tiktokBox);
+	auto *tiktokHint = new QLabel("Configura il tuo account TikTok e la tua chiave Euler Stream. "
+		"Questa configurazione non effettua il login TikTok e non modifica titolo o categoria.", tiktokBox);
+	tiktokHint->setWordWrap(true);
+	tiktokLayout->addWidget(tiktokHint);
+	auto *tiktokForm = new QFormLayout();
+	auto *tiktokUser = new QLineEdit(tiktokBox);
+	tiktokUser->setPlaceholderText("@nomeutente");
+	auto *eulerKey = new QLineEdit(tiktokBox);
+	eulerKey->setEchoMode(QLineEdit::Password);
+	eulerKey->setPlaceholderText("API key personale Euler Stream");
+	tiktokForm->addRow("Username TikTok", tiktokUser);
+	tiktokForm->addRow("Euler API key", eulerKey);
+	tiktokLayout->addLayout(tiktokForm);
+	const QString tiktokPath = svc::configDir() + "/tiktok-euler.json";
+	{
+		QFile f(tiktokPath);
+		if (f.open(QIODevice::ReadOnly)) {
+			const auto obj = QJsonDocument::fromJson(f.readAll()).object();
+			tiktokUser->setText(obj.value("username").toString());
+			eulerKey->setText(obj.value("api_key").toString());
+		}
+	}
+	auto *tiktokActions = new QHBoxLayout();
+	auto *tiktokSave = new QPushButton("Salva configurazione", tiktokBox);
+	auto *tiktokClear = new QPushButton("Rimuovi account", tiktokBox);
+	auto *tiktokOpen = new QPushButton("Apri TikTok LIVE", tiktokBox);
+	tiktokActions->addWidget(tiktokSave);
+	tiktokActions->addWidget(tiktokClear);
+	tiktokActions->addWidget(tiktokOpen);
+	tiktokLayout->addLayout(tiktokActions);
+	connect(tiktokSave, &QPushButton::clicked, this, [this, tiktokUser, eulerKey, tiktokPath]() {
+		QString username = tiktokUser->text().trimmed();
+		if (username.startsWith('@')) username.remove(0, 1);
+		if (!QRegularExpression("^[A-Za-z0-9._]{2,24}$").match(username).hasMatch()) {
+			QMessageBox::warning(this, "TikTok", "Inserisci uno username TikTok valido.");
+			return;
+		}
+		if (eulerKey->text().trimmed().isEmpty()) {
+			QMessageBox::warning(this, "TikTok", "Inserisci la tua API key Euler Stream.");
+			return;
+		}
+		QJsonObject obj;
+		obj["username"] = username;
+		obj["api_key"] = eulerKey->text().trimmed();
+		if (!QDir().mkpath(svc::configDir())) {
+			QMessageBox::warning(this, "TikTok", "Impossibile creare la cartella impostazioni.");
+			return;
+		}
+		QSaveFile f(tiktokPath);
+		if (!f.open(QIODevice::WriteOnly) || f.write(QJsonDocument(obj).toJson()) < 0 || !f.commit()) {
+			QMessageBox::warning(this, "TikTok", "Impossibile salvare la configurazione.");
+			return;
+		}
+		showLines({"TikTok: configurazione locale salvata. Nessun login o aggiornamento LIVE eseguito."});
+	});
+	connect(tiktokClear, &QPushButton::clicked, this, [this, tiktokUser, eulerKey, tiktokPath]() {
+		if (QFile::exists(tiktokPath) && !QFile::remove(tiktokPath)) {
+			QMessageBox::warning(this, "TikTok", "Impossibile rimuovere la configurazione.");
+			return;
+		}
+		tiktokUser->clear();
+		eulerKey->clear();
+		showLines({"TikTok: configurazione locale rimossa."});
+	});
+	connect(tiktokOpen, &QPushButton::clicked, this, []() {
+		QDesktopServices::openUrl(QUrl("https://www.tiktok.com/live"));
+	});
+	root->addWidget(tiktokBox);
 
 	m_current = new QLabel(m_content);
 	m_current->setWordWrap(true);
