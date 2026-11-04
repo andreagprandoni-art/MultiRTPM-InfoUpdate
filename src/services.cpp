@@ -852,6 +852,39 @@ QString currentSummary(Platform p)
 	return QString();
 }
 
+Result verifyTikTokEuler(const QString &username, const QString &apiKey)
+{
+	QString user = username.trimmed();
+	if (user.startsWith('@')) user.remove(0, 1);
+	if (!QRegularExpression("^[A-Za-z0-9._]{2,24}$").match(user).hasMatch())
+		return {false, "Username TikTok non valido"};
+	if (apiKey.trimmed().isEmpty())
+		return {false, "Inserisci la tua API key Euler Stream"};
+	const QUrl url("https://api.eulerstream.com/tiktok/users/" +
+		QString::fromLatin1(QUrl::toPercentEncoding(user)) + "/basic");
+	const Headers headers = {{QByteArray("x-api-key"), apiKey.trimmed().toUtf8()},
+		{QByteArray("Accept"), QByteArray("application/json")}};
+	const HttpResponse r = http("GET", url, headers);
+	if (r.status == 401 || r.status == 403)
+		return {false, "Euler Stream: chiave non autorizzata (HTTP " + QString::number(r.status) + ")"};
+	if (r.status == 429)
+		return {false, "Euler Stream: limite richieste raggiunto (HTTP 429)"};
+	if (r.status != 200)
+		return {false, "Euler Stream: verifica fallita (HTTP " + QString::number(r.status) +
+			(r.error.isEmpty() ? QString() : ", errore di rete") + ")"};
+	const QJsonObject obj = r.json();
+	if (obj.isEmpty())
+		return {false, "Euler Stream: risposta JSON non valida"};
+	const QJsonObject data = obj.value("data").toObject();
+	const QJsonObject profile = data.value("user").toObject();
+	const QJsonObject direct = obj.value("user").toObject();
+	QString name = profile.value("nickname").toString();
+	if (name.isEmpty()) name = direct.value("nickname").toString();
+	return {true, "Accesso API Euler verificato per @" + user +
+		(name.isEmpty() ? QString() : " (" + name + ")") +
+		". Questo NON equivale al login TikTok e non consente di modificare la LIVE."};
+}
+
 QJsonObject presets()
 {
 	return loadAll().value("presets").toObject();
