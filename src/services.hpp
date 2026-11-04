@@ -1,4 +1,4 @@
-// Accesso alle API di Twitch, Kick e YouTube (login OAuth, ricerca categorie, aggiornamento info live).
+// Accesso alle API di Twitch e Kick (login OAuth, ricerca categorie, aggiornamento info live).
 // Licenza: GPL-2.0-or-later (come il template ufficiale dei plugin OBS)
 #pragma once
 
@@ -7,8 +7,8 @@
 #include <QString>
 #include <QStringList>
 
-enum class Platform { Twitch = 0, Kick = 1, YouTube = 2 };
-constexpr int kPlatformCount = 3;
+enum class Platform { Twitch = 0, Kick = 1 };
+constexpr int kPlatformCount = 2;
 
 struct Category {
 	QString id;
@@ -17,12 +17,10 @@ struct Category {
 
 struct StreamInfo {
 	QString title;
-	QString description;
 	QString language;
 	QStringList tags;
 	QString twitchCategoryId;
 	QString kickCategoryId;
-	QString youtubeCategoryId;
 };
 
 struct Result {
@@ -49,7 +47,7 @@ bool setCredentials(Platform p, const QString &clientId, const QString &clientSe
 bool isConfigured(Platform p);
 bool isConnected(Platform p);
 
-// Nome dell'account/canale collegato, se noto (YouTube: nome del canale), altrimenti vuoto.
+// Nome dell'account/canale collegato, se noto, altrimenti vuoto.
 QString accountLabel(Platform p);
 void disconnectAccount(Platform p);
 

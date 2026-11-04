@@ -16,7 +16,6 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
-#include <QPlainTextEdit>
 #include <QProgressDialog>
 #include <QPushButton>
 #include <QRegularExpression>
@@ -28,7 +27,7 @@
 
 namespace {
 
-const Platform kAll[kPlatformCount] = {Platform::Twitch, Platform::Kick, Platform::YouTube};
+const Platform kAll[kPlatformCount] = {Platform::Twitch, Platform::Kick};
 
 // ------------------------------------------------------------------ finestra impostazioni
 class SettingsDialog : public QDialog {
@@ -49,10 +48,9 @@ public:
 		lay->addWidget(intro);
 
 		const char *where[kPlatformCount] = {
-			"<a href=\"https://dev.twitch.tv/console\">dev.twitch.tv/console</a> · tipo client: Confidential",
-			"kick.com → Impostazioni → Developer · permessi: user:read, channel:read, channel:write",
-			"<a href=\"https://console.cloud.google.com/apis/credentials\">console.cloud.google.com</a> · "
-			"ID client OAuth di tipo \"App desktop\" · YouTube Data API v3 abilitata"};
+			"<a href=\"https://dev.twitch.tv/console\">dev.twitch.tv/console</a> · client Confidential",
+			"kick.com → Impostazioni → Developer · permessi: user:read, channel:read, channel:write"
+		};
 
 		for (int i = 0; i < kPlatformCount; ++i) {
 			const Platform p = kAll[i];
@@ -118,15 +116,10 @@ private:
 				QMessageBox::warning(this, "Impostazioni", name + ": manca il Client ID.");
 				return;
 			}
-			if (kAll[i] != Platform::YouTube && secret.isEmpty()) {
+			if (secret.isEmpty()) {
 				QMessageBox::warning(this, "Impostazioni", name + ": manca il Client Secret.");
 				return;
 			}
-			if (kAll[i] == Platform::YouTube && !id.endsWith(".apps.googleusercontent.com") &&
-			    QMessageBox::question(this, "Impostazioni",
-						  "Il Client ID di YouTube di solito finisce con "
-						  ".apps.googleusercontent.com. Salvare comunque?") != QMessageBox::Yes)
-				return;
 		}
 		bool saved = true;
 		for (int i = 0; i < kPlatformCount; ++i)
@@ -240,7 +233,7 @@ void InfoPanel::buildUi()
 	root->addWidget(m_title);
 	connect(m_title, &QLineEdit::textChanged, this, [this](const QString &t) {
 		m_count->setText(QString("%1/140").arg(t.size()));
-		m_count->setStyleSheet(t.size() > 100 ? "color: orange;" : "");
+		m_count->setStyleSheet(t.size() > 140 ? "color: red;" : "");
 	});
 
 	// --- categoria
@@ -258,18 +251,8 @@ void InfoPanel::buildUi()
 	auto *form = new QFormLayout();
 	m_twitchCat = new QComboBox(m_content);
 	m_kickCat = new QComboBox(m_content);
-	m_ytCat = new QComboBox(m_content);
-	const QList<QPair<QString, QString>> ytCats = {{"Gaming", "20"},
-							{"Intrattenimento", "24"},
-							{"Persone e blog", "22"},
-							{"Musica", "10"},
-							{"Istruzione", "27"},
-							{"Scienza e tecnologia", "28"}};
-	for (const auto &c : ytCats)
-		m_ytCat->addItem(c.first, c.second);
 	form->addRow("Twitch", m_twitchCat);
 	form->addRow("Kick", m_kickCat);
-	form->addRow("YouTube", m_ytCat);
 	root->addLayout(form);
 
 	// --- tag, lingua, descrizione
@@ -288,10 +271,6 @@ void InfoPanel::buildUi()
 	langRow->addRow("Lingua (Twitch)", m_lang);
 	root->addLayout(langRow);
 
-	root->addWidget(new QLabel("Descrizione (YouTube)", m_content));
-	m_desc = new QPlainTextEdit(m_content);
-	m_desc->setMaximumHeight(80);
-	root->addWidget(m_desc);
 
 	// --- azione
 	m_go = new QPushButton("Aggiorna le piattaforme selezionate", m_content);
@@ -436,6 +415,8 @@ void InfoPanel::doSearch()
 	if (q.size() < 2)
 		return;
 	setBusy(true);
+	m_twitchCat->clear();
+	m_kickCat->clear();
 	QStringList problems;
 	if (svc::isConnected(Platform::Twitch)) {
 		QString err;
@@ -459,7 +440,6 @@ StreamInfo InfoPanel::collect() const
 {
 	StreamInfo info;
 	info.title = m_title->text().trimmed();
-	info.description = m_desc->toPlainText();
 	info.language = m_lang->currentData().toString();
 	for (const QString &t : m_tags->text().split(',', Qt::SkipEmptyParts)) {
 		QString tag = t.trimmed();
@@ -470,15 +450,14 @@ StreamInfo InfoPanel::collect() const
 	}
 	info.twitchCategoryId = m_twitchCat->currentData().toString();
 	info.kickCategoryId = m_kickCat->currentData().toString();
-	info.youtubeCategoryId = m_ytCat->currentData().toString();
 	return info;
 }
 
 void InfoPanel::doUpdate()
 {
 	const StreamInfo info = collect();
-	if (info.title.isEmpty()) {
-		showLines({"✖ Scrivi un titolo."});
+	if (info.title.isEmpty() || info.title.size() > 140) {
+		showLines({"✖ Il titolo deve contenere da 1 a 140 caratteri."});
 		return;
 	}
 	QList<Platform> chosen;
@@ -515,7 +494,6 @@ QJsonObject InfoPanel::toPreset() const
 {
 	QJsonObject o;
 	o["title"] = m_title->text();
-	o["description"] = m_desc->toPlainText();
 	o["tags"] = m_tags->text();
 	o["language"] = m_lang->currentData().toString();
 	o["search"] = m_search->text();
@@ -523,22 +501,17 @@ QJsonObject InfoPanel::toPreset() const
 	o["twitch_name"] = m_twitchCat->currentText();
 	o["kick_id"] = m_kickCat->currentData().toString();
 	o["kick_name"] = m_kickCat->currentText();
-	o["youtube_id"] = m_ytCat->currentData().toString();
 	return o;
 }
 
 void InfoPanel::applyPreset(const QJsonObject &o)
 {
 	m_title->setText(o["title"].toString());
-	m_desc->setPlainText(o["description"].toString());
 	m_tags->setText(o["tags"].toString());
 	m_search->setText(o["search"].toString());
 	const int lang = m_lang->findData(o["language"].toString());
 	if (lang >= 0)
 		m_lang->setCurrentIndex(lang);
-	const int yt = m_ytCat->findData(o["youtube_id"].toString());
-	if (yt >= 0)
-		m_ytCat->setCurrentIndex(yt);
 	m_twitchCat->clear();
 	if (!o["twitch_id"].toString().isEmpty())
 		m_twitchCat->addItem(o["twitch_name"].toString(), o["twitch_id"].toString());

@@ -1,43 +1,15 @@
-# Informativa sulla privacy / Privacy policy
+# Privacy / Informativa sulla privacy
 
 ## Italiano
+**Multistream Info Panel** è un plugin locale di OBS che comunica direttamente con le API ufficiali di Twitch e Kick. Legge il nome e i metadati del canale necessari e aggiorna titolo, categoria, tag e (per Twitch) lingua solo su comando dell'utente.
 
-**Multistream Info Panel** è un plugin per OBS Studio che aggiorna titolo, categoria, tag, lingua e
-descrizione della tua diretta su Twitch, Kick e YouTube.
+Non è previsto alcun server gestito dagli autori. Client ID, Client Secret, access token, refresh token e preset restano sul computer in `%APPDATA%\obs-studio\plugin_config\multistream-info-panel\settings.json`. **I segreti sono memorizzati in chiaro.** Non condividere questo file.
 
-- **Nessun nostro server.** Il plugin comunica direttamente tra il tuo computer e Twitch, Kick e Google.
-  Non raccogliamo, non riceviamo e non conserviamo alcun tuo dato.
-- **Cosa viene salvato sul tuo PC.** Il Client ID/Secret della tua app sviluppatore, i token di accesso che le piattaforme rilasciano dopo il tuo login
-  e i preset che crei, in `%APPDATA%\obs-studio\plugin_config\multistream-info-panel\settings.json`.
-  I token sono salvati in chiaro: non condividere quel file.
-- **Cosa viene letto e modificato.** Solo i dati del tuo canale necessari al plugin: titolo, categoria, tag,
-  lingua e descrizione della diretta, e il tuo nome canale per identificarlo. Nessun altro dato è letto o modificato.
-- **Uso dei dati Google.** L'uso e il trasferimento delle informazioni ricevute dalle API di Google rispettano la
-  [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy),
-  inclusi i requisiti di Limited Use. Il plugin usa i dati YouTube solo per aggiornare la tua diretta.
-  Inoltre il plugin usa i servizi API di YouTube: si applicano i [Termini di servizio di YouTube](https://www.youtube.com/t/terms).
-- **Come revocare l'accesso.** Nel pannello premi **Scollega** (rimuove i token dal PC), poi revoca il permesso:
-  YouTube/Google → myaccount.google.com/permissions; Twitch → twitch.tv/settings/connections;
-  Kick → impostazioni account, sezione app collegate.
-- **Contatti.** apri una segnalazione (Issue) nel repository GitHub del plugin.
+Le precedenti versioni supportavano YouTube. Questa versione non comunica con YouTube né mostra tale piattaforma, ma **non cancella automaticamente** la vecchia sezione `youtube` dalle impostazioni locali. Per eliminarla: fai backup del file, chiudi OBS, rimuovi manualmente la sezione `youtube` dal JSON, quindi riapri OBS. Revoca separatamente i permessi Google dal tuo account.
+
+Per revocare Twitch o Kick, usa **Scollega** per cancellare i token locali e revoca l'app anche nelle impostazioni del servizio.
 
 ## English
+This local OBS Studio plugin directly contacts Twitch and Kick official APIs to read and update channel metadata at the user's request. No project-operated server handles the data. Client IDs, secrets, tokens and presets are stored **unencrypted** in the local OBS plugin configuration file. Do not share it.
 
-**Multistream Info Panel** is an OBS Studio plugin that updates the title, category, tags, language and
-description of your live stream on Twitch, Kick and YouTube.
-
-- **No server of ours.** The plugin talks directly between your computer and Twitch, Kick and Google.
-  We do not collect, receive or store any of your data.
-- **What is stored on your PC.** The Client ID/Secret of your own developer app, the access tokens issued by the platforms after you sign in, and the presets you
-  create, in `%APPDATA%\obs-studio\plugin_config\multistream-info-panel\settings.json`. Tokens are stored in plain
-  text: do not share that file.
-- **What is read and changed.** Only the channel data the plugin needs: stream title, category, tags, language
-  and description, plus your channel name to identify it. Nothing else is read or changed.
-- **Google user data.** Use and transfer of information received from Google APIs adheres to the
-  [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy),
-  including the Limited Use requirements. YouTube data is used only to update your live stream.
-  The plugin uses YouTube API Services: the [YouTube Terms of Service](https://www.youtube.com/t/terms) apply.
-- **How to revoke access.** Press **Scollega** (Disconnect) in the panel to remove the tokens from your PC, then revoke
-  the permission: Google → myaccount.google.com/permissions; Twitch → twitch.tv/settings/connections;
-  Kick → account settings, connected apps.
-- **Contact.** open an Issue in the plugin's GitHub repository.
+Legacy YouTube settings may remain in an existing local configuration file; this version does not use them or call YouTube. Back up the file before manually removing the `youtube` JSON section. Revoke old Google permissions separately. Disconnecting locally does not revoke access on the platform's side.

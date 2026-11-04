@@ -2,7 +2,7 @@
 #include "services.hpp"
 
 #include <plugin-support.h>
-#include <util/base.h>
+#include <obs.h> // LOG_WARNING is defined by the OBS public API.
 
 #include <QCryptographicHash>
 #include <QDateTime>
@@ -62,8 +62,6 @@ const Spec &spec(Platform p)
 		 "channel:manage:broadcast", false},
 		{"kick", "Kick", "https://id.kick.com/oauth/authorize", "https://id.kick.com/oauth/token",
 		 "user:read channel:read channel:write", true},
-		{"youtube", "YouTube", "https://accounts.google.com/o/oauth2/v2/auth",
-		 "https://oauth2.googleapis.com/token", "https://www.googleapis.com/auth/youtube", true},
 	};
 	return specs[static_cast<int>(p)];
 }
@@ -290,27 +288,6 @@ QString failureText(Platform p, const QString &step, const HttpResponse &r)
 	if (r.status == 0)
 		return prefix + "nessuna risposta da " + name + " (" + describeFailure(r) +
 		       "). Controlla la connessione, antivirus o proxy, poi riprova.";
-	if (p == Platform::YouTube) {
-		if (b.contains("youtubeSignupRequired"))
-			return prefix + "l'account Google scelto non ha un canale YouTube. Se il tuo canale e' un account "
-					"\"brand\": premi Scollega, poi Collega e nella schermata di Google scegli il canale del "
-					"brand (non l'account personale).";
-		if (b.contains("quotaExceeded") || b.contains("rateLimitExceeded"))
-			return prefix + "quota giornaliera di YouTube esaurita per la tua app Google. Si azzera ogni "
-					"giorno (mezzanotte, fuso orario del Pacifico); riprova piu' tardi.";
-		if (b.contains("accessNotConfigured") || b.contains("SERVICE_DISABLED"))
-			return prefix + "la YouTube Data API v3 non e' abilitata nel tuo progetto Google Cloud. "
-					"Abilitala da \"API e servizi > Libreria\" e riprova.";
-		if (b.contains("liveStreamingNotEnabled"))
-			return prefix + "il canale non ha le dirette abilitate: attivale in YouTube Studio "
-					"(puo' servire la verifica del telefono e fino a 24 ore).";
-		if (b.contains("invalidTitle"))
-			return prefix + "titolo non valido per YouTube (massimo 100 caratteri, senza < e >).";
-		if (b.contains("invalidDescription"))
-			return prefix + "descrizione non valida per YouTube (massimo 5000 byte, senza < e >).";
-		if (b.contains("invalidTags"))
-			return prefix + "tag non validi per YouTube (massimo 500 caratteri in tutto).";
-	}
 	if (r.status == 401)
 		return prefix + name + " ha rifiutato l'accesso. Premi Scollega, poi Collega per rifare il login.";
 	if (r.status == 403)
@@ -409,9 +386,6 @@ QString accessToken(Platform p, QString *error, bool force = false)
 	if (r.status == 400 || r.status == 401) {
 		// Il refresh token non vale piu' (revocato, scaduto, password cambiata...).
 		*error = "Sessione scaduta: premi Scollega e poi Collega.";
-		if (p == Platform::YouTube)
-			*error += " (Se la tua app Google e' in modalita' \"Test\" il collegamento dura solo 7 giorni: "
-				  "pubblica l'app nella schermata di consenso.)";
 		return QString();
 	}
 	*error = "Impossibile rinnovare l'accesso a " + QString::fromLatin1(spec(p).name) + " ora (" +
@@ -447,7 +421,7 @@ HttpResponse apiCall(Platform p, const QByteArray &verb, const QUrl &url, const 
 		return httpRetry(verb, url, h, body);
 	};
 	HttpResponse r = send(token);
-	if (r.status == 401 && !r.body.contains("youtubeSignupRequired")) {
+	if (r.status == 401) {
 		const QString fresh = accessToken(p, error, true);
 		if (fresh.isEmpty())
 			return HttpResponse();
@@ -524,7 +498,7 @@ Result updateTwitch(const StreamInfo &i)
 
 	QJsonObject body;
 	if (!i.title.isEmpty())
-		body["title"] = i.title.left(140);
+		body["title"] = i.title;
 	if (!i.twitchCategoryId.isEmpty())
 		body["game_id"] = i.twitchCategoryId;
 	if (!i.language.isEmpty())
@@ -549,11 +523,26 @@ Result updateKick(const StreamInfo &i)
 {
 	QJsonObject body;
 	if (!i.title.isEmpty())
-		body["stream_title"] = i.title.left(140);
-	if (!i.kickCategoryId.isEmpty())
-		body["category_id"] = i.kickCategoryId.toInt();
-	if (!i.tags.isEmpty())
-		body["custom_tags"] = toJsonArray(i.tags.mid(0, 10));
+		body["stream_title"] = i.title;
+	if (!i.kickCategoryId.isEmpty()) {
+		bool valid = false;
+		const int category = i.kickCategoryId.toInt(&valid);
+		if (!valid || category <= 0)
+			return {false, "Categoria Kick non valida: effettua una nuova ricerca"};
+		body["category_id"] = category;
+	}
+	if (!i.tags.isEmpty()) {
+		QStringList cleaned;
+		for (QString tag : i.tags) {
+			tag = tag.trimmed();
+			if (!tag.isEmpty() && !cleaned.contains(tag, Qt::CaseInsensitive))
+				cleaned << tag;
+			if (cleaned.size() == 10)
+				break;
+		}
+		if (!cleaned.isEmpty())
+			body["custom_tags"] = toJsonArray(cleaned);
+	}
 
 	QString err;
 	const HttpResponse r = apiCall(Platform::Kick, "PATCH", QUrl("https://api.kick.com/public/v1/channels"),
@@ -563,73 +552,6 @@ Result updateKick(const StreamInfo &i)
 	if (r.status == 204 || r.status == 200)
 		return {true, "Aggiornato"};
 	return {false, failureText(Platform::Kick, QString(), r)};
-}
-
-Result updateYouTube(const StreamInfo &i)
-{
-	QString err;
-
-	// Cerca la diretta attiva, altrimenti quella programmata.
-	QString videoId;
-	for (const char *status : {"active", "upcoming"}) {
-		QUrl url("https://www.googleapis.com/youtube/v3/liveBroadcasts");
-		QUrlQuery q;
-		q.addQueryItem("part", "id");
-		q.addQueryItem("broadcastStatus", status);
-		url.setQuery(q);
-		const HttpResponse r = apiCall(Platform::YouTube, "GET", url, QByteArray(), &err);
-		if (!err.isEmpty())
-			return {false, err};
-		if (r.status != 200)
-			return {false, failureText(Platform::YouTube, "Ricerca della diretta", r)};
-		const QJsonArray items = r.json()["items"].toArray();
-		if (!items.isEmpty()) {
-			videoId = items.first().toObject()["id"].toString();
-			break;
-		}
-	}
-	if (videoId.isEmpty())
-		return {false, "Nessuna diretta YouTube attiva o programmata (creala in YouTube Studio)"};
-
-	// Legge lo stato attuale del video per non perdere i campi che non vogliamo cambiare.
-	QUrl vurl("https://www.googleapis.com/youtube/v3/videos");
-	QUrlQuery vq;
-	vq.addQueryItem("part", "snippet");
-	vq.addQueryItem("id", videoId);
-	vurl.setQuery(vq);
-	const HttpResponse cur = apiCall(Platform::YouTube, "GET", vurl, QByteArray(), &err);
-	if (!err.isEmpty())
-		return {false, err};
-	const QJsonArray vitems = cur.json()["items"].toArray();
-	if (cur.status != 200 || vitems.isEmpty())
-		return {false, failureText(Platform::YouTube, "Lettura della diretta", cur)};
-	const QJsonObject old = vitems.first().toObject()["snippet"].toObject();
-
-	QJsonObject snippet;
-	snippet["title"] = (i.title.isEmpty() ? old["title"].toString() : i.title).left(100);
-	snippet["description"] = i.description.isEmpty() ? old["description"].toString() : i.description;
-	snippet["categoryId"] = i.youtubeCategoryId.isEmpty() ? (old["categoryId"].toString().isEmpty()
-									  ? QString("20")
-									  : old["categoryId"].toString())
-							       : i.youtubeCategoryId;
-	snippet["tags"] = i.tags.isEmpty() ? old["tags"].toArray() : toJsonArray(i.tags);
-	if (old.contains("defaultLanguage"))
-		snippet["defaultLanguage"] = old["defaultLanguage"];
-
-	QJsonObject body;
-	body["id"] = videoId;
-	body["snippet"] = snippet;
-
-	QUrl purl("https://www.googleapis.com/youtube/v3/videos");
-	QUrlQuery pq;
-	pq.addQueryItem("part", "snippet");
-	purl.setQuery(pq);
-	const HttpResponse r = apiCall(Platform::YouTube, "PUT", purl, jsonBody(body), &err);
-	if (!err.isEmpty())
-		return {false, err};
-	if (r.status == 200)
-		return {true, "Aggiornato"};
-	return {false, failureText(Platform::YouTube, "Aggiornamento della diretta", r)};
 }
 
 } // namespace
@@ -750,10 +672,6 @@ Result login(Platform p)
 	q.addQueryItem("response_type", "code");
 	q.addQueryItem("scope", QString::fromLatin1(sp.scope));
 	q.addQueryItem("state", state);
-	if (p == Platform::YouTube) {
-		q.addQueryItem("access_type", "offline");
-		q.addQueryItem("prompt", "select_account consent");
-	}
 	if (sp.pkce) {
 		verifier = randomToken(48);
 		const QByteArray challenge = QCryptographicHash::hash(verifier.toLatin1(), QCryptographicHash::Sha256)
@@ -806,9 +724,6 @@ Result login(Platform p)
 		if (cb.hasQueryItem("error")) {
 			const QString e = cb.queryItemValue("error");
 			failure = "Accesso negato o annullato (" + e + ")";
-			if (p == Platform::YouTube && e == "access_denied")
-				failure += ". Se la tua app Google e' in modalita' \"Test\", aggiungi il tuo account tra gli "
-					   "\"Utenti di test\" nella schermata di consenso OAuth.";
 		} else if (cb.queryItemValue("state") != state) {
 			failure = "Risposta non valida (state diverso): riprova a premere Collega";
 		} else {
@@ -852,35 +767,6 @@ Result login(Platform p)
 	if (p == Platform::Twitch) {
 		QString err;
 		twitchUserId(&err);
-	}
-	if (p == Platform::YouTube) {
-		// Controlla subito QUALE canale e' stato collegato (account brand!) invece di scoprirlo all'aggiornamento.
-		QString err;
-		QUrl curl("https://www.googleapis.com/youtube/v3/channels");
-		QUrlQuery cq;
-		cq.addQueryItem("part", "snippet");
-		cq.addQueryItem("mine", "true");
-		curl.setQuery(cq);
-		const HttpResponse c = apiCall(p, "GET", curl, QByteArray(), &err);
-		if (!err.isEmpty()) {
-			disconnectAccount(p);
-			return {false, err};
-		}
-		const QJsonArray ch = c.json()["items"].toArray();
-		if (c.status == 200 && !ch.isEmpty()) {
-			QJsonObject ys = section(p);
-			ys["channel_title"] = ch.first().toObject()["snippet"].toObject()["title"].toString();
-			setSection(p, ys);
-		} else if (c.status == 200 || c.body.contains("youtubeSignupRequired")) {
-			disconnectAccount(p);
-			return {false, "Collegato all'account Google, ma senza un canale YouTube. "
-						"Google ti ha collegato con l'account personale invece che con il canale. Se il tuo canale e' un account "
-					"\"brand\", premi Collega e, nella schermata di Google, scegli il canale del brand (appare nell'elenco "
-					"degli account o nel passaggio \"Scegli un canale\") e non l'account personale."};
-		} else if (c.status > 0 && c.status < 500) {
-			disconnectAccount(p);
-			return {false, failureText(p, "Verifica del canale", c)};
-		}
 	}
 	return {true, "Collegato"};
 }
@@ -932,8 +818,6 @@ Result updateChannel(Platform p, const StreamInfo &info)
 		return updateTwitch(info);
 	case Platform::Kick:
 		return updateKick(info);
-	case Platform::YouTube:
-		return updateYouTube(info);
 	}
 	return {false, "Piattaforma sconosciuta"};
 }

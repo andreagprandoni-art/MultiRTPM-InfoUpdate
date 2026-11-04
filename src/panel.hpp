@@ -10,7 +10,6 @@ class QCheckBox;
 class QComboBox;
 class QLabel;
 class QLineEdit;
-class QPlainTextEdit;
 class QPushButton;
 
 class InfoPanel : public QScrollArea {
@@ -48,10 +47,8 @@ private:
 	QLineEdit *m_search = nullptr;
 	QComboBox *m_twitchCat = nullptr;
 	QComboBox *m_kickCat = nullptr;
-	QComboBox *m_ytCat = nullptr;
 	QLineEdit *m_tags = nullptr;
 	QComboBox *m_lang = nullptr;
-	QPlainTextEdit *m_desc = nullptr;
 	QPushButton *m_go = nullptr;
 	QLabel *m_results = nullptr;
 	QString m_lastResults;

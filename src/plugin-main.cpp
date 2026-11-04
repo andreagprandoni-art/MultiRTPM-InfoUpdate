@@ -1,6 +1,6 @@
 /*
 Multistream Info Panel
-Pannello per aggiornare titolo, categoria e info della live su Twitch, Kick e YouTube da dentro OBS.
+Pannello per aggiornare titolo, categoria e info della live su Twitch e Kick da dentro OBS.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@ bool obs_module_load(void)
 	bfree(dir);
 
 	auto *panel = new InfoPanel();
-	if (obs_frontend_add_dock_by_id(kDockId, "Info Live", panel)) {
+	if (obs_frontend_add_dock_by_id(kDockId, "Info Live · Kick / Twitch", panel)) {
 		g_dockAdded = true;
 	} else {
 		obs_log(LOG_WARNING, "impossibile aggiungere il dock 'Info Live'");
