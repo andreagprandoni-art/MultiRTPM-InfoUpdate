@@ -2,7 +2,7 @@
 #include "services.hpp"
 
 #include <plugin-support.h>
-// plugin-support.h declares blogva; avoid the conflicting OBS util/base.h declaration.
+#include <obs.h> // LOG_WARNING is defined by the OBS public API.
 
 #include <QCryptographicHash>
 #include <QDateTime>
