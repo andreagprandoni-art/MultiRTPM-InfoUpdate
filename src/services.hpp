@@ -47,7 +47,7 @@ bool setCredentials(Platform p, const QString &clientId, const QString &clientSe
 bool isConfigured(Platform p);
 bool isConnected(Platform p);
 
-// Nome dell'account/canale collegato, se noto (YouTube: nome del canale), altrimenti vuoto.
+// Nome dell'account/canale collegato, se noto, altrimenti vuoto.
 QString accountLabel(Platform p);
 void disconnectAccount(Platform p);
 
